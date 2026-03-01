@@ -8,8 +8,8 @@ struct GeminiStatusBar: View {
       // Gemini connection pill
       StatusPill(color: geminiStatusColor, text: geminiStatusText)
 
-      // OpenClaw connection pill
-      StatusPill(color: openClawStatusColor, text: openClawStatusText)
+      // PA Backend connection pill
+      StatusPill(color: paBackendStatusColor, text: paBackendStatusText)
     }
   }
 
@@ -31,8 +31,8 @@ struct GeminiStatusBar: View {
     }
   }
 
-  private var openClawStatusColor: Color {
-    switch geminiVM.openClawConnectionState {
+  private var paBackendStatusColor: Color {
+    switch geminiVM.paBackendConnectionState {
     case .connected: return .green
     case .checking: return .yellow
     case .unreachable: return .red
@@ -40,12 +40,12 @@ struct GeminiStatusBar: View {
     }
   }
 
-  private var openClawStatusText: String {
-    switch geminiVM.openClawConnectionState {
-    case .connected: return "OpenClaw"
-    case .checking: return "OpenClaw..."
-    case .unreachable: return "OpenClaw Off"
-    case .notConfigured: return "No OpenClaw"
+  private var paBackendStatusText: String {
+    switch geminiVM.paBackendConnectionState {
+    case .connected: return "PA Backend"
+    case .checking: return "PA..."
+    case .unreachable: return "PA Offline"
+    case .notConfigured: return "No PA Key"
     }
   }
 }

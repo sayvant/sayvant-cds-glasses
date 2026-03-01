@@ -7,12 +7,9 @@ final class SettingsManager {
 
   private enum Key: String {
     case geminiAPIKey
-    case openClawHost
-    case openClawPort
-    case openClawHookToken
-    case openClawGatewayToken
     case geminiSystemPrompt
-    case webrtcSignalingURL
+    case paBackendURL
+    case cdsAPIKey
   }
 
   private init() {}
@@ -29,43 +26,22 @@ final class SettingsManager {
     set { defaults.set(newValue, forKey: Key.geminiSystemPrompt.rawValue) }
   }
 
-  // MARK: - OpenClaw
+  // MARK: - PA Backend
 
-  var openClawHost: String {
-    get { defaults.string(forKey: Key.openClawHost.rawValue) ?? Secrets.openClawHost }
-    set { defaults.set(newValue, forKey: Key.openClawHost.rawValue) }
+  var paBackendURL: String {
+    get { defaults.string(forKey: Key.paBackendURL.rawValue) ?? Secrets.paBackendURL }
+    set { defaults.set(newValue, forKey: Key.paBackendURL.rawValue) }
   }
 
-  var openClawPort: Int {
-    get {
-      let stored = defaults.integer(forKey: Key.openClawPort.rawValue)
-      return stored != 0 ? stored : Secrets.openClawPort
-    }
-    set { defaults.set(newValue, forKey: Key.openClawPort.rawValue) }
-  }
-
-  var openClawHookToken: String {
-    get { defaults.string(forKey: Key.openClawHookToken.rawValue) ?? Secrets.openClawHookToken }
-    set { defaults.set(newValue, forKey: Key.openClawHookToken.rawValue) }
-  }
-
-  var openClawGatewayToken: String {
-    get { defaults.string(forKey: Key.openClawGatewayToken.rawValue) ?? Secrets.openClawGatewayToken }
-    set { defaults.set(newValue, forKey: Key.openClawGatewayToken.rawValue) }
-  }
-
-  // MARK: - WebRTC
-
-  var webrtcSignalingURL: String {
-    get { defaults.string(forKey: Key.webrtcSignalingURL.rawValue) ?? Secrets.webrtcSignalingURL }
-    set { defaults.set(newValue, forKey: Key.webrtcSignalingURL.rawValue) }
+  var cdsAPIKey: String {
+    get { defaults.string(forKey: Key.cdsAPIKey.rawValue) ?? Secrets.cdsAPIKey }
+    set { defaults.set(newValue, forKey: Key.cdsAPIKey.rawValue) }
   }
 
   // MARK: - Reset
 
   func resetAll() {
-    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .openClawHost, .openClawPort,
-                .openClawHookToken, .openClawGatewayToken, .webrtcSignalingURL] {
+    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .paBackendURL, .cdsAPIKey] {
       defaults.removeObject(forKey: key.rawValue)
     }
   }

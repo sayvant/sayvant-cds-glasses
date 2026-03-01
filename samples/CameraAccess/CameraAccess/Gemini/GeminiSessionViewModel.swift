@@ -10,21 +10,19 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
   @Published var toolCallStatus: ToolCallStatus = .idle
-  @Published var openClawConnectionState: OpenClawConnectionState = .notConfigured
+  @Published var paBackendConnectionState: PABackendConnectionState = .notConfigured
+
   private let geminiService = GeminiLiveService()
-  private let openClawBridge = OpenClawBridge()
+  let paBackendBridge = PABackendBridge()
   private var toolCallRouter: ToolCallRouter?
   private let audioManager = AudioManager()
-  private var lastVideoFrameTime: Date = .distantPast
   private var stateObservation: Task<Void, Never>?
-
-  var streamingMode: StreamingMode = .glasses
 
   func startSession() async {
     guard !isGeminiActive else { return }
 
     guard GeminiConfig.isConfigured else {
-      errorMessage = "Gemini API key not configured. Open GeminiConfig.swift and replace YOUR_GEMINI_API_KEY with your key from https://aistudio.google.com/apikey"
+      errorMessage = "Gemini API key not configured. Go to Settings and enter your key from https://aistudio.google.com/apikey"
       return
     }
 
@@ -34,9 +32,6 @@ class GeminiSessionViewModel: ObservableObject {
     audioManager.onAudioCaptured = { [weak self] data in
       guard let self else { return }
       Task { @MainActor in
-        // iPhone mode: mute mic while model speaks to prevent echo feedback
-        // (loudspeaker + co-located mic overwhelms iOS echo cancellation)
-        if self.streamingMode == .iPhone && self.geminiService.isModelSpeaking { return }
         self.geminiService.sendAudio(data: data)
       }
     }
@@ -52,7 +47,6 @@ class GeminiSessionViewModel: ObservableObject {
     geminiService.onTurnComplete = { [weak self] in
       guard let self else { return }
       Task { @MainActor in
-        // Clear user transcript when AI finishes responding
         self.userTranscript = ""
       }
     }
@@ -82,12 +76,12 @@ class GeminiSessionViewModel: ObservableObject {
       }
     }
 
-    // Check OpenClaw connectivity and start fresh session
-    await openClawBridge.checkConnection()
-    openClawBridge.resetSession()
+    // Check PA backend connectivity and start fresh session
+    await paBackendBridge.checkConnection()
+    paBackendBridge.resetSession()
 
     // Wire tool call handling
-    toolCallRouter = ToolCallRouter(bridge: openClawBridge)
+    toolCallRouter = ToolCallRouter(bridge: paBackendBridge)
 
     geminiService.onToolCall = { [weak self] toolCall in
       guard let self else { return }
@@ -115,14 +109,14 @@ class GeminiSessionViewModel: ObservableObject {
         guard !Task.isCancelled else { break }
         self.connectionState = self.geminiService.connectionState
         self.isModelSpeaking = self.geminiService.isModelSpeaking
-        self.toolCallStatus = self.openClawBridge.lastToolCallStatus
-        self.openClawConnectionState = self.openClawBridge.connectionState
+        self.toolCallStatus = self.paBackendBridge.lastToolCallStatus
+        self.paBackendConnectionState = self.paBackendBridge.connectionState
       }
     }
 
-    // Setup audio
+    // Setup audio — Bluetooth routing for glasses speaker
     do {
-      try audioManager.setupAudioSession(useIPhoneMode: streamingMode == .iPhone)
+      try audioManager.setupAudioSession(useBluetoothGlasses: true)
     } catch {
       errorMessage = "Audio setup failed: \(error.localizedDescription)"
       isGeminiActive = false
@@ -176,13 +170,4 @@ class GeminiSessionViewModel: ObservableObject {
     aiTranscript = ""
     toolCallStatus = .idle
   }
-
-  func sendVideoFrameIfThrottled(image: UIImage) {
-    guard isGeminiActive, connectionState == .ready else { return }
-    let now = Date()
-    guard now.timeIntervalSince(lastVideoFrameTime) >= GeminiConfig.videoFrameInterval else { return }
-    lastVideoFrameTime = now
-    geminiService.sendVideoFrame(image: image)
-  }
-
 }

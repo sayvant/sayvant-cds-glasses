@@ -5,12 +5,9 @@ struct SettingsView: View {
   private let settings = SettingsManager.shared
 
   @State private var geminiAPIKey: String = ""
-  @State private var openClawHost: String = ""
-  @State private var openClawPort: String = ""
-  @State private var openClawHookToken: String = ""
-  @State private var openClawGatewayToken: String = ""
+  @State private var paBackendURL: String = ""
+  @State private var cdsAPIKey: String = ""
   @State private var geminiSystemPrompt: String = ""
-  @State private var webrtcSignalingURL: String = ""
   @State private var showResetConfirmation = false
 
   var body: some View {
@@ -28,18 +25,18 @@ struct SettingsView: View {
           }
         }
 
-        Section(header: Text("System Prompt"), footer: Text("Customize the AI assistant's behavior and personality. Changes take effect on the next Gemini session.")) {
+        Section(header: Text("System Prompt"), footer: Text("Clinical advisor behavior. Changes take effect on next session.")) {
           TextEditor(text: $geminiSystemPrompt)
             .font(.system(.body, design: .monospaced))
             .frame(minHeight: 200)
         }
 
-        Section(header: Text("OpenClaw"), footer: Text("Connect to an OpenClaw gateway running on your Mac for agentic tool-calling.")) {
+        Section(header: Text("PA Backend"), footer: Text("Sayvant Predictive Analytics backend for clinical decision support.")) {
           VStack(alignment: .leading, spacing: 4) {
-            Text("Host")
+            Text("Backend URL")
               .font(.caption)
               .foregroundColor(.secondary)
-            TextField("http://your-mac.local", text: $openClawHost)
+            TextField("https://predictive-analytics.up.railway.app", text: $paBackendURL)
               .autocapitalization(.none)
               .disableAutocorrection(true)
               .keyboardType(.URL)
@@ -47,44 +44,12 @@ struct SettingsView: View {
           }
 
           VStack(alignment: .leading, spacing: 4) {
-            Text("Port")
+            Text("CDS API Key")
               .font(.caption)
               .foregroundColor(.secondary)
-            TextField("18789", text: $openClawPort)
-              .keyboardType(.numberPad)
-              .font(.system(.body, design: .monospaced))
-          }
-
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Hook Token")
-              .font(.caption)
-              .foregroundColor(.secondary)
-            TextField("Hook token", text: $openClawHookToken)
+            TextField("CDS API key", text: $cdsAPIKey)
               .autocapitalization(.none)
               .disableAutocorrection(true)
-              .font(.system(.body, design: .monospaced))
-          }
-
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Gateway Token")
-              .font(.caption)
-              .foregroundColor(.secondary)
-            TextField("Gateway auth token", text: $openClawGatewayToken)
-              .autocapitalization(.none)
-              .disableAutocorrection(true)
-              .font(.system(.body, design: .monospaced))
-          }
-        }
-
-        Section(header: Text("WebRTC")) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Signaling URL")
-              .font(.caption)
-              .foregroundColor(.secondary)
-            TextField("wss://your-server.example.com", text: $webrtcSignalingURL)
-              .autocapitalization(.none)
-              .disableAutocorrection(true)
-              .keyboardType(.URL)
               .font(.system(.body, design: .monospaced))
           }
         }
@@ -130,22 +95,14 @@ struct SettingsView: View {
   private func loadCurrentValues() {
     geminiAPIKey = settings.geminiAPIKey
     geminiSystemPrompt = settings.geminiSystemPrompt
-    openClawHost = settings.openClawHost
-    openClawPort = String(settings.openClawPort)
-    openClawHookToken = settings.openClawHookToken
-    openClawGatewayToken = settings.openClawGatewayToken
-    webrtcSignalingURL = settings.webrtcSignalingURL
+    paBackendURL = settings.paBackendURL
+    cdsAPIKey = settings.cdsAPIKey
   }
 
   private func save() {
     settings.geminiAPIKey = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.geminiSystemPrompt = geminiSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    settings.openClawHost = openClawHost.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let port = Int(openClawPort.trimmingCharacters(in: .whitespacesAndNewlines)) {
-      settings.openClawPort = port
-    }
-    settings.openClawHookToken = openClawHookToken.trimmingCharacters(in: .whitespacesAndNewlines)
-    settings.openClawGatewayToken = openClawGatewayToken.trimmingCharacters(in: .whitespacesAndNewlines)
-    settings.webrtcSignalingURL = webrtcSignalingURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    settings.paBackendURL = paBackendURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    settings.cdsAPIKey = cdsAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

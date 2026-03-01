@@ -67,7 +67,7 @@ enum ToolCallStatus: Equatable {
   var displayText: String {
     switch self {
     case .idle: return ""
-    case .executing(let name): return "Running: \(name)..."
+    case .executing(let name): return "Analyzing: \(name)..."
     case .completed(let name): return "Done: \(name)"
     case .failed(let name, let err): return "Failed: \(name) - \(err)"
     case .cancelled(let name): return "Cancelled: \(name)"
@@ -85,21 +85,21 @@ enum ToolCallStatus: Equatable {
 enum ToolDeclarations {
 
   static func allDeclarations() -> [[String: Any]] {
-    return [execute]
+    return [analyzeEncounter]
   }
 
-  static let execute: [String: Any] = [
-    "name": "execute",
-    "description": "Your only way to take action. You have no memory, storage, or ability to do anything on your own -- use this tool for everything: sending messages, searching the web, adding to lists, setting reminders, creating notes, research, drafts, scheduling, smart home control, app interactions, or any request that goes beyond answering a question. When in doubt, use this tool.",
+  static let analyzeEncounter: [String: Any] = [
+    "name": "analyze_encounter",
+    "description": "Analyze the current patient encounter for clinical decision support. Call this after hearing clinically relevant information -- symptoms, risk factors, medical history, or answers to clinical questions. Returns suggested questions to ask next and red flag alerts. Do NOT call for greetings, small talk, or non-clinical speech.",
     "parameters": [
       "type": "object",
       "properties": [
-        "task": [
+        "transcript": [
           "type": "string",
-          "description": "Clear, detailed description of what to do. Include all relevant context: names, content, platforms, quantities, etc."
+          "description": "The full encounter transcript heard so far, including both physician questions and patient responses"
         ]
       ],
-      "required": ["task"]
+      "required": ["transcript"]
     ] as [String: Any],
     "behavior": "BLOCKING"
   ]

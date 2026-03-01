@@ -24,20 +24,28 @@ class AudioManager {
     )!
   }
 
-  func setupAudioSession(useIPhoneMode: Bool = false) throws {
+  func setupAudioSession(useBluetoothGlasses: Bool = true) throws {
     let session = AVAudioSession.sharedInstance()
-    // iPhone mode: voiceChat for aggressive echo cancellation (mic + speaker co-located)
-    // Glasses mode: videoChat for mild AEC (mic is on glasses, speaker is on phone)
-    let mode: AVAudioSession.Mode = useIPhoneMode ? .voiceChat : .videoChat
-    try session.setCategory(
-      .playAndRecord,
-      mode: mode,
-      options: [.defaultToSpeaker, .allowBluetooth]
-    )
+    if useBluetoothGlasses {
+      // Glasses mode: route audio through Bluetooth (Ray-Ban speaker).
+      // No defaultToSpeaker — whispers go through glasses, not phone speaker.
+      try session.setCategory(
+        .playAndRecord,
+        mode: .voiceChat,
+        options: [.allowBluetooth, .allowBluetoothA2DP]
+      )
+    } else {
+      // Phone-only mode: speaker + aggressive echo cancellation
+      try session.setCategory(
+        .playAndRecord,
+        mode: .voiceChat,
+        options: [.defaultToSpeaker, .allowBluetooth]
+      )
+    }
     try session.setPreferredSampleRate(GeminiConfig.inputAudioSampleRate)
     try session.setPreferredIOBufferDuration(0.064)
     try session.setActive(true)
-    NSLog("[Audio] Session mode: %@", useIPhoneMode ? "voiceChat (iPhone)" : "videoChat (glasses)")
+    NSLog("[Audio] Session mode: %@", useBluetoothGlasses ? "Bluetooth glasses" : "iPhone speaker")
   }
 
   func startCapture() throws {

@@ -2,14 +2,14 @@ import Foundation
 
 @MainActor
 class ToolCallRouter {
-  private let bridge: OpenClawBridge
+  private let bridge: PABackendBridge
   private var inFlightTasks: [String: Task<Void, Never>] = [:]
 
-  init(bridge: OpenClawBridge) {
+  init(bridge: PABackendBridge) {
     self.bridge = bridge
   }
 
-  /// Route a tool call from Gemini to OpenClaw. Calls sendResponse with the
+  /// Route a tool call from Gemini to the PA backend. Calls sendResponse with the
   /// JSON dictionary to send back as a toolResponse message.
   func handleToolCall(
     _ call: GeminiFunctionCall,
@@ -22,8 +22,16 @@ class ToolCallRouter {
           callName, callId, String(describing: call.args))
 
     let task = Task { @MainActor in
-      let taskDesc = call.args["task"] as? String ?? String(describing: call.args)
-      let result = await bridge.delegateTask(task: taskDesc, toolName: callName)
+      let result: ToolResult
+
+      switch callName {
+      case "analyze_encounter":
+        let transcript = call.args["transcript"] as? String ?? ""
+        result = await bridge.analyzeEncounter(transcript: transcript)
+      default:
+        NSLog("[ToolCall] Unknown tool: %@", callName)
+        result = .failure("Unknown tool: \(callName)")
+      }
 
       guard !Task.isCancelled else {
         NSLog("[ToolCall] Task %@ was cancelled, skipping response", callId)

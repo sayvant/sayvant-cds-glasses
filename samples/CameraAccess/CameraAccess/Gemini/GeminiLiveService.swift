@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 enum GeminiConnectionState: Equatable {
   case disconnected
@@ -123,23 +122,6 @@ class GeminiLiveService: ObservableObject {
         "realtimeInput": [
           "audio": [
             "mimeType": "audio/pcm;rate=16000",
-            "data": base64
-          ]
-        ]
-      ]
-      self?.sendJSON(json)
-    }
-  }
-
-  func sendVideoFrame(image: UIImage) {
-    guard connectionState == .ready else { return }
-    sendQueue.async { [weak self] in
-      guard let jpegData = image.jpegData(compressionQuality: GeminiConfig.videoJPEGQuality) else { return }
-      let base64 = jpegData.base64EncodedString()
-      let json: [String: Any] = [
-        "realtimeInput": [
-          "video": [
-            "mimeType": "image/jpeg",
             "data": base64
           ]
         ]
