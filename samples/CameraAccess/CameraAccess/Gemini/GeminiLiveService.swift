@@ -136,6 +136,27 @@ class GeminiLiveService: ObservableObject {
     }
   }
 
+  /// Send a text message to Gemini within the live session (e.g., summary request).
+  func sendTextMessage(_ text: String) {
+    guard connectionState == .ready else { return }
+    sendQueue.async { [weak self] in
+      let json: [String: Any] = [
+        "clientContent": [
+          "turns": [
+            [
+              "role": "user",
+              "parts": [
+                ["text": text]
+              ]
+            ]
+          ],
+          "turnComplete": true
+        ]
+      ]
+      self?.sendJSON(json)
+    }
+  }
+
   // MARK: - Private
 
   private func resolveConnect(success: Bool) {
@@ -168,12 +189,12 @@ class GeminiLiveService: ObservableObject {
         "realtimeInputConfig": [
           "automaticActivityDetection": [
             "disabled": false,
-            "startOfSpeechSensitivity": "START_SENSITIVITY_HIGH",
+            "startOfSpeechSensitivity": "START_SENSITIVITY_LOW",
             "endOfSpeechSensitivity": "END_SENSITIVITY_LOW",
-            "silenceDurationMs": 500,
-            "prefixPaddingMs": 40
+            "silenceDurationMs": 3000,
+            "prefixPaddingMs": 20
           ],
-          "activityHandling": "START_OF_ACTIVITY_INTERRUPTS",
+          "activityHandling": "NO_INTERRUPTION",
           "turnCoverage": "TURN_INCLUDES_ALL_INPUT"
         ],
         "inputAudioTranscription": [:] as [String: Any],

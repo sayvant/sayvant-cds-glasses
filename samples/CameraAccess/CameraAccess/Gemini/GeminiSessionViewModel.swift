@@ -9,6 +9,7 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var errorMessage: String?
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
+  @Published var transcriptEntries: [TranscriptEntry] = []
   @Published var toolCallStatus: ToolCallStatus = .idle
   @Published var paBackendConnectionState: PABackendConnectionState = .notConfigured
 
@@ -17,6 +18,10 @@ class GeminiSessionViewModel: ObservableObject {
   private var toolCallRouter: ToolCallRouter?
   private let audioManager = AudioManager()
   private var stateObservation: Task<Void, Never>?
+
+  /// Audio gate: only play Gemini audio that arrives after we send a tool response.
+  /// Prevents Gemini's conversational/acknowledgment audio from playing.
+  private var audioGateOpen = false
 
   func startSession() async {
     guard !isGeminiActive else { return }
@@ -37,16 +42,19 @@ class GeminiSessionViewModel: ObservableObject {
     }
 
     geminiService.onAudioReceived = { [weak self] data in
-      self?.audioManager.playAudio(data: data)
+      guard let self, self.audioGateOpen else { return }
+      self.audioManager.playAudio(data: data)
     }
 
     geminiService.onInterrupted = { [weak self] in
+      self?.audioGateOpen = false
       self?.audioManager.stopPlayback()
     }
 
     geminiService.onTurnComplete = { [weak self] in
       guard let self else { return }
       Task { @MainActor in
+        self.audioGateOpen = false
         self.userTranscript = ""
       }
     }
@@ -56,6 +64,8 @@ class GeminiSessionViewModel: ObservableObject {
       Task { @MainActor in
         self.userTranscript += text
         self.aiTranscript = ""
+        // Append to transcript log
+        self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
       }
     }
 
@@ -63,6 +73,8 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         self.aiTranscript += text
+        // Append AI response to transcript log
+        self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .ai))
       }
     }
 
@@ -79,6 +91,7 @@ class GeminiSessionViewModel: ObservableObject {
     // Check PA backend connectivity and start fresh session
     await paBackendBridge.checkConnection()
     paBackendBridge.resetSession()
+    paBackendBridge.startAutoSave()
 
     // Wire tool call handling
     toolCallRouter = ToolCallRouter(bridge: paBackendBridge)
@@ -87,8 +100,14 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         for call in toolCall.functionCalls {
+          // analyzeEncounter now calls /comprehensive_analysis (single call)
+          // which returns prediction + differential + guidance + workup
           self.toolCallRouter?.handleToolCall(call) { [weak self] response in
-            self?.geminiService.sendToolResponse(response)
+            guard let self else { return }
+            // Open the audio gate: next audio from Gemini is the whisper
+            self.audioGateOpen = true
+            NSLog("[AudioGate] Opened — tool response sent, ready for whisper audio")
+            self.geminiService.sendToolResponse(response)
           }
         }
       }
@@ -156,7 +175,39 @@ class GeminiSessionViewModel: ObservableObject {
     }
   }
 
+  /// Physician taps "What did I miss?" — open audio gate and ask Gemini to summarize.
+  func requestSummary() {
+    guard isGeminiActive else { return }
+
+    // Build summary from accumulated PA data
+    var prompt = "The physician is asking: what did I miss? Summarize what they should still ask. "
+
+    let questions = paBackendBridge.askNextQuestions
+    let flags = paBackendBridge.redFlags
+    let score = paBackendBridge.completenessScore
+
+    if !flags.isEmpty {
+      let flagTexts = flags.map { $0.message }
+      prompt += "Red flags: \(flagTexts.joined(separator: "; ")). "
+    }
+
+    if !questions.isEmpty {
+      let qTexts = questions.map { $0.example_phrasing }
+      prompt += "Questions still needed: \(qTexts.joined(separator: "; ")). "
+    }
+
+    prompt += "Completeness: \(Int(score))%. "
+    prompt += "Speak a brief summary of what questions they should still ask. Under 30 words. Do not list scores."
+
+    NSLog("[Summary] Requesting: %@", prompt)
+
+    // Open the audio gate — this is the ONE time we want to hear Gemini
+    audioGateOpen = true
+    geminiService.sendTextMessage(prompt)
+  }
+
   func stopSession() {
+    paBackendBridge.stopAutoSave()
     toolCallRouter?.cancelAll()
     toolCallRouter = nil
     audioManager.stopCapture()
@@ -166,8 +217,10 @@ class GeminiSessionViewModel: ObservableObject {
     isGeminiActive = false
     connectionState = .disconnected
     isModelSpeaking = false
+    audioGateOpen = false
     userTranscript = ""
     aiTranscript = ""
+    transcriptEntries = []
     toolCallStatus = .idle
   }
 }
