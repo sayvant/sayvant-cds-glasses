@@ -18,6 +18,8 @@ class GeminiSessionViewModel: ObservableObject {
   private var toolCallRouter: ToolCallRouter?
   private let audioManager = AudioManager()
   private var stateObservation: Task<Void, Never>?
+  private var autoAnalysisTask: Task<Void, Never>?
+  private var lastAutoAnalyzedLength = 0
 
   /// Audio gate: only play Gemini audio that arrives after we send a tool response.
   /// Prevents Gemini's conversational/acknowledgment audio from playing.
@@ -69,8 +71,9 @@ class GeminiSessionViewModel: ObservableObject {
           self.aiTranscript = ""
         }
         self.userTranscript += text
-        // Append to transcript log
+        // Append to transcript log and accumulate in bridge for auto-analysis
         self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
+        self.paBackendBridge.appendTranscript(text)
       }
     }
 
@@ -179,6 +182,27 @@ class GeminiSessionViewModel: ObservableObject {
       connectionState = .disconnected
       return
     }
+
+    // Start auto-analysis loop: every 10 seconds, if new transcript text has
+    // accumulated, send to /comprehensive_analysis for real-time card updates.
+    // This runs independently of Gemini tool calls — cards update even if
+    // Gemini hasn't decided to call analyze_encounter yet.
+    lastAutoAnalyzedLength = 0
+    autoAnalysisTask = Task { [weak self] in
+      // Wait 8 seconds before first analysis to accumulate some speech
+      try? await Task.sleep(nanoseconds: 8_000_000_000)
+      while !Task.isCancelled {
+        guard let self else { break }
+        let currentLength = self.paBackendBridge.fullTranscript.count
+        let hasNewText = currentLength > self.lastAutoAnalyzedLength + 15 // ~3 words
+        if hasNewText {
+          self.lastAutoAnalyzedLength = currentLength
+          NSLog("[AutoAnalysis] Triggering (transcript: %d chars)", currentLength)
+          await self.paBackendBridge.runAutoAnalysis()
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+      }
+    }
   }
 
   /// Physician taps "What did I miss?" — open audio gate and ask Gemini to summarize.
@@ -222,6 +246,8 @@ class GeminiSessionViewModel: ObservableObject {
 
   func stopSession() {
     paBackendBridge.stopAutoSave()
+    autoAnalysisTask?.cancel()
+    autoAnalysisTask = nil
     toolCallRouter?.cancelAll()
     toolCallRouter = nil
     audioManager.stopCapture()

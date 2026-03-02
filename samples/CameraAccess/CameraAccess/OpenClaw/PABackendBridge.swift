@@ -153,28 +153,26 @@ class PABackendBridge: ObservableObject {
     NSLog("[PABackend] Session reset")
   }
 
+  // MARK: - Transcript Accumulation
+
+  /// Append new speech text to the running transcript (called from onInputTranscription).
+  func appendTranscript(_ text: String) {
+    guard !text.isEmpty else { return }
+    if !fullTranscript.isEmpty {
+      fullTranscript += " "
+    }
+    fullTranscript += text
+  }
+
   // MARK: - Comprehensive Analysis
 
-  /// Call /comprehensive_analysis with encounter transcript.
-  /// Updates ALL published state (prediction, differential, guidance, workup, uncertainty)
-  /// and returns a tool result string for Gemini to vocalize.
-  func analyzeEncounter(transcript: String) async -> ToolResult {
-    let toolName = "analyze_encounter"
-    lastToolCallStatus = .executing(toolName)
-    isPredicting = true
-
-    // Accumulate transcript
-    if !transcript.isEmpty {
-      if !fullTranscript.isEmpty {
-        fullTranscript += "\n"
-      }
-      fullTranscript += transcript
-    }
-
+  /// Shared core: call /comprehensive_analysis, update all published state.
+  /// Returns the decoded response on success, nil on failure.
+  private func callComprehensiveAnalysis(text: String) async -> ComprehensiveResponse? {
+    guard !text.isEmpty else { return nil }
     guard let url = URL(string: "\(GeminiConfig.paBackendURL)/comprehensive_analysis") else {
-      lastToolCallStatus = .failed(toolName, "Invalid URL")
-      isPredicting = false
-      return .failure("Invalid PA backend URL")
+      NSLog("[PABackend] Invalid PA backend URL")
+      return nil
     }
 
     var request = URLRequest(url: url)
@@ -183,7 +181,7 @@ class PABackendBridge: ObservableObject {
     request.setValue(GeminiConfig.cdsAPIKey, forHTTPHeaderField: "X-CDS-Key")
 
     let body: [String: Any] = [
-      "text": transcript,
+      "text": text,
       "previously_asked": previouslyAsked,
       "previously_flagged": previouslyFlagged,
     ]
@@ -195,70 +193,99 @@ class PABackendBridge: ObservableObject {
       guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         NSLog("[PABackend] comprehensive_analysis failed: HTTP %d", code)
-        lastToolCallStatus = .failed(toolName, "HTTP \(code)")
-        isPredicting = false
-        return .failure("PA backend returned HTTP \(code)")
+        return nil
       }
 
       let comprehensive = try JSONDecoder().decode(ComprehensiveResponse.self, from: data)
-      comprehensiveResult = comprehensive
+      applyComprehensiveResult(comprehensive)
 
-      // Update prediction state for card views
-      if let pred = comprehensive.prediction.toPredictResponse() {
-        predictionResult = pred
-
-        // Track timeline entry for risk trend chart
-        let newFeatures = comprehensive.prediction.feature_contributions?
-          .prefix(3).map { $0.feature } ?? []
-        timelineEntries.append(TimelineEntry(
-          timestamp: Date(),
-          acsProb: pred.prob,
-          completeness: comprehensive.guidance.completeness.overall_score,
-          newFeatures: Array(newFeatures)
-        ))
-      }
-
-      // Update dedup state for guidance
-      for q in comprehensive.guidance.ask_next {
-        if !previouslyAsked.contains(q.id) {
-          previouslyAsked.append(q.id)
-        }
-      }
-      for rf in comprehensive.guidance.red_flags {
-        if !previouslyFlagged.contains(rf.id) {
-          previouslyFlagged.append(rf.id)
-        }
-      }
-
-      // Update published guidance state for UI
-      completenessScore = comprehensive.guidance.completeness.overall_score
-      askNextQuestions = comprehensive.guidance.ask_next
-
-      for rf in comprehensive.guidance.red_flags {
-        if !redFlags.contains(where: { $0.id == rf.id }) {
-          redFlags.append(rf)
-        }
-      }
-      if !comprehensive.guidance.red_flags.isEmpty {
-        activeRedFlag = comprehensive.guidance.red_flags.first?.message
-      }
-
-      // Build response string for Gemini to vocalize
-      let resultText = buildGeminiResponse(comprehensive)
       NSLog("[PABackend] comprehensive result: prob=%.3f diff=%d workup=%d",
             comprehensive.prediction.acs_probability ?? 0,
             comprehensive.differential.ranked_diagnoses.count,
             comprehensive.recommended_workup.count)
-      lastToolCallStatus = .completed(toolName)
-      isPredicting = false
-      return .success(resultText)
 
+      return comprehensive
     } catch {
       NSLog("[PABackend] comprehensive error: %@", error.localizedDescription)
-      lastToolCallStatus = .failed(toolName, error.localizedDescription)
-      isPredicting = false
-      return .failure("Analysis error: \(error.localizedDescription)")
+      return nil
     }
+  }
+
+  /// Apply a comprehensive response to all published state.
+  private func applyComprehensiveResult(_ comprehensive: ComprehensiveResponse) {
+    comprehensiveResult = comprehensive
+
+    // Update prediction state for card views
+    if let pred = comprehensive.prediction.toPredictResponse() {
+      predictionResult = pred
+
+      // Track timeline entry for risk trend chart
+      let newFeatures = comprehensive.prediction.feature_contributions?
+        .prefix(3).map { $0.feature } ?? []
+      timelineEntries.append(TimelineEntry(
+        timestamp: Date(),
+        acsProb: pred.prob,
+        completeness: comprehensive.guidance.completeness.overall_score,
+        newFeatures: Array(newFeatures)
+      ))
+    }
+
+    // Update dedup state for guidance
+    for q in comprehensive.guidance.ask_next {
+      if !previouslyAsked.contains(q.id) {
+        previouslyAsked.append(q.id)
+      }
+    }
+    for rf in comprehensive.guidance.red_flags {
+      if !previouslyFlagged.contains(rf.id) {
+        previouslyFlagged.append(rf.id)
+      }
+    }
+
+    // Update published guidance state for UI
+    completenessScore = comprehensive.guidance.completeness.overall_score
+    askNextQuestions = comprehensive.guidance.ask_next
+
+    for rf in comprehensive.guidance.red_flags {
+      if !redFlags.contains(where: { $0.id == rf.id }) {
+        redFlags.append(rf)
+      }
+    }
+    if !comprehensive.guidance.red_flags.isEmpty {
+      activeRedFlag = comprehensive.guidance.red_flags.first?.message
+    }
+  }
+
+  /// Call /comprehensive_analysis via Gemini tool call.
+  /// Updates all published state and returns a tool result string for Gemini to vocalize.
+  func analyzeEncounter(transcript: String) async -> ToolResult {
+    let toolName = "analyze_encounter"
+    lastToolCallStatus = .executing(toolName)
+    isPredicting = true
+
+    // Accumulate transcript
+    appendTranscript(transcript)
+
+    guard let comprehensive = await callComprehensiveAnalysis(text: fullTranscript) else {
+      lastToolCallStatus = .failed(toolName, "Analysis failed")
+      isPredicting = false
+      return .failure("PA backend analysis failed")
+    }
+
+    let resultText = buildGeminiResponse(comprehensive)
+    lastToolCallStatus = .completed(toolName)
+    isPredicting = false
+    return .success(resultText)
+  }
+
+  /// Auto-triggered analysis from transcript accumulation (no Gemini tool call).
+  /// Updates all published state for real-time card rendering.
+  func runAutoAnalysis() async {
+    guard !isPredicting else { return }
+    guard !fullTranscript.isEmpty else { return }
+    isPredicting = true
+    _ = await callComprehensiveAnalysis(text: fullTranscript)
+    isPredicting = false
   }
 
   /// Build a structured response string that Gemini will use to generate
@@ -299,48 +326,7 @@ class PABackendBridge: ObservableObject {
   func analyzeText(_ text: String) async {
     guard !text.isEmpty else { return }
     isPredicting = true
-
-    guard let url = URL(string: "\(GeminiConfig.paBackendURL)/comprehensive_analysis") else {
-      NSLog("[PABackend] analyzeText: invalid URL")
-      isPredicting = false
-      return
-    }
-
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.setValue(GeminiConfig.cdsAPIKey, forHTTPHeaderField: "X-CDS-Key")
-
-    let body: [String: Any] = ["text": text]
-
-    do {
-      request.httpBody = try JSONSerialization.data(withJSONObject: body)
-      let (data, response) = try await session.data(for: request)
-
-      guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-        NSLog("[PABackend] analyzeText failed: HTTP %d", code)
-        isPredicting = false
-        return
-      }
-
-      let comprehensive = try JSONDecoder().decode(ComprehensiveResponse.self, from: data)
-      comprehensiveResult = comprehensive
-
-      if let pred = comprehensive.prediction.toPredictResponse() {
-        predictionResult = pred
-      }
-
-      completenessScore = comprehensive.guidance.completeness.overall_score
-      askNextQuestions = comprehensive.guidance.ask_next
-      redFlags = comprehensive.guidance.red_flags
-      if !redFlags.isEmpty {
-        activeRedFlag = redFlags.first?.message
-      }
-    } catch {
-      NSLog("[PABackend] analyzeText error: %@", error.localizedDescription)
-    }
-
+    _ = await callComprehensiveAnalysis(text: text)
     isPredicting = false
   }
 
