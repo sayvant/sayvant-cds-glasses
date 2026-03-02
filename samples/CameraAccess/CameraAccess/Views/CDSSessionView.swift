@@ -49,6 +49,11 @@ private struct CDSSessionContent: View {
         preSessionView
       }
     }
+    // Encounter summary sheet lives at top level so it survives
+    // the isActive → false transition when session ends
+    .sheet(item: $showEncounterSummary) { encounter in
+      EncounterSummaryView(encounter: encounter)
+    }
   }
 
   // MARK: - Pre-Session Splash
@@ -273,9 +278,6 @@ private struct CDSSessionContent: View {
       sessionButton
       errorView
     }
-    .sheet(item: $showEncounterSummary) { encounter in
-      EncounterSummaryView(encounter: encounter)
-    }
   }
 
   // MARK: - Card Stack (shared between active session and manual results)
@@ -397,15 +399,29 @@ private struct CDSSessionContent: View {
   }
 
   private func endSession() {
-    // Save encounter before stopping
+    // Capture all data BEFORE stopping (stopSession clears VM state)
     let transcript = bridge.fullTranscript
-    let hasData = prediction != nil || !bridge.redFlags.isEmpty
+    let hasAnyData = !transcript.isEmpty
+      || prediction != nil
+      || !bridge.redFlags.isEmpty
+      || bridge.completenessScore > 0
+      || !geminiVM.transcriptEntries.isEmpty
 
-    if hasData {
+    if hasAnyData {
+      // Build transcript from entries if fullTranscript is empty
+      let finalTranscript: String
+      if transcript.isEmpty && !geminiVM.transcriptEntries.isEmpty {
+        finalTranscript = geminiVM.transcriptEntries
+          .map { ($0.speaker == .patient ? "Patient: " : "CDS: ") + $0.text }
+          .joined(separator: "\n")
+      } else {
+        finalTranscript = transcript
+      }
+
       let encounter = SavedEncounter(
         id: UUID().uuidString,
         date: Date(),
-        transcript: transcript,
+        transcript: finalTranscript,
         acsRiskPct: prediction?.probabilityPct,
         riskBand: prediction?.band,
         topDiagnosis: comprehensive?.differential.ranked_diagnoses.first?.diagnosis,

@@ -55,15 +55,20 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         self.audioGateOpen = false
-        self.userTranscript = ""
+        // Don't clear userTranscript here — keep it visible in the transcript pane
+        // until new input arrives. It will be cleared when onInputTranscription fires.
       }
     }
 
     geminiService.onInputTranscription = { [weak self] text in
       guard let self else { return }
       Task { @MainActor in
+        // Clear previous turn's text when new patient speech starts
+        if self.userTranscript.isEmpty || self.aiTranscript.isEmpty == false {
+          self.userTranscript = ""
+          self.aiTranscript = ""
+        }
         self.userTranscript += text
-        self.aiTranscript = ""
         // Append to transcript log
         self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
       }
@@ -92,6 +97,7 @@ class GeminiSessionViewModel: ObservableObject {
     await paBackendBridge.checkConnection()
     paBackendBridge.resetSession()
     paBackendBridge.startAutoSave()
+    transcriptEntries = []
 
     // Wire tool call handling
     toolCallRouter = ToolCallRouter(bridge: paBackendBridge)
@@ -180,24 +186,32 @@ class GeminiSessionViewModel: ObservableObject {
     guard isGeminiActive else { return }
 
     // Build summary from accumulated PA data
-    var prompt = "The physician is asking: what did I miss? Summarize what they should still ask. "
-
     let questions = paBackendBridge.askNextQuestions
     let flags = paBackendBridge.redFlags
     let score = paBackendBridge.completenessScore
 
-    if !flags.isEmpty {
-      let flagTexts = flags.map { $0.message }
-      prompt += "Red flags: \(flagTexts.joined(separator: "; ")). "
-    }
+    var prompt: String
 
-    if !questions.isEmpty {
-      let qTexts = questions.map { $0.example_phrasing }
-      prompt += "Questions still needed: \(qTexts.joined(separator: "; ")). "
-    }
+    if score > 0 || !questions.isEmpty || !flags.isEmpty {
+      // We have CDS data — build a targeted summary
+      prompt = "The physician is asking: what did I miss? Summarize what they should still ask. "
 
-    prompt += "Completeness: \(Int(score))%. "
-    prompt += "Speak a brief summary of what questions they should still ask. Under 30 words. Do not list scores."
+      if !flags.isEmpty {
+        let flagTexts = flags.map { $0.message }
+        prompt += "Red flags: \(flagTexts.joined(separator: "; ")). "
+      }
+
+      if !questions.isEmpty {
+        let qTexts = questions.map { $0.example_phrasing }
+        prompt += "Questions still needed: \(qTexts.joined(separator: "; ")). "
+      }
+
+      prompt += "Completeness: \(Int(score))%. "
+      prompt += "Speak a brief summary of what questions they should still ask. Under 30 words. Do not list scores."
+    } else {
+      // No CDS data yet — ask Gemini to summarize from conversation context
+      prompt = "The physician is asking: what did I miss? Based on what you've heard so far in this encounter, briefly summarize what key questions still need to be asked for a thorough chest pain workup. Under 30 words."
+    }
 
     NSLog("[Summary] Requesting: %@", prompt)
 
@@ -220,7 +234,8 @@ class GeminiSessionViewModel: ObservableObject {
     audioGateOpen = false
     userTranscript = ""
     aiTranscript = ""
-    transcriptEntries = []
+    // Don't clear transcriptEntries here — they're needed for encounter summary.
+    // They'll be cleared on next startSession() via resetSession().
     toolCallStatus = .idle
   }
 }
