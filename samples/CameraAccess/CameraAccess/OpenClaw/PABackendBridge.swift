@@ -8,12 +8,52 @@ enum PABackendConnectionState: Equatable {
   case unreachable(String)
 }
 
+/// Pre-flight readiness check results.
+struct PreFlightStatus {
+  var geminiKeyPresent: Bool = false
+  var cdsKeyPresent: Bool = false
+  var backendReachable: Bool = false
+  var backendLatencyMs: Int?
+  var backendError: String?
+
+  var overallState: OverallState {
+    if geminiKeyPresent && cdsKeyPresent && backendReachable { return .ready }
+    if backendReachable { return .partial }
+    if !geminiKeyPresent && !cdsKeyPresent { return .notConfigured }
+    return .error
+  }
+
+  var statusMessage: String {
+    if !geminiKeyPresent && !cdsKeyPresent { return "API keys not configured" }
+    if !geminiKeyPresent { return "Missing Gemini API key" }
+    if !cdsKeyPresent { return "Missing CDS API key" }
+    if let err = backendError { return "Backend: \(err)" }
+    if !backendReachable { return "Backend unreachable" }
+    if let ms = backendLatencyMs { return "Ready (\(ms)ms)" }
+    return "Ready"
+  }
+
+  enum OverallState {
+    case ready, partial, error, notConfigured
+
+    var dotColor: String {
+      switch self {
+      case .ready: return "green"
+      case .partial: return "yellow"
+      case .error: return "red"
+      case .notConfigured: return "gray"
+      }
+    }
+  }
+}
+
 /// Bridges Gemini tool calls to the PA backend /comprehensive_analysis endpoint.
 /// Single API call returns prediction, differential, guidance, workup, and uncertainty.
 @MainActor
 class PABackendBridge: ObservableObject {
   @Published var lastToolCallStatus: ToolCallStatus = .idle
   @Published var connectionState: PABackendConnectionState = .notConfigured
+  @Published var preFlightStatus = PreFlightStatus()
 
   /// Latest completeness score from the backend.
   @Published var completenessScore: Double = 0
@@ -110,6 +150,34 @@ class PABackendBridge: ObservableObject {
       safetyApplied: predictionResult?.safety_applied ?? false
     )
     SessionState.save(state)
+  }
+
+  // MARK: - Pre-flight check
+
+  func runPreFlightCheck() async {
+    var status = PreFlightStatus()
+    status.geminiKeyPresent = GeminiConfig.isConfigured
+    status.cdsKeyPresent = GeminiConfig.isPABackendConfigured
+
+    if status.cdsKeyPresent {
+      let start = Date()
+      await checkConnection()
+      let latency = Int(Date().timeIntervalSince(start) * 1000)
+
+      if case .connected = connectionState {
+        status.backendReachable = true
+        status.backendLatencyMs = latency
+      } else if case .unreachable(let msg) = connectionState {
+        status.backendError = msg
+      }
+    }
+
+    preFlightStatus = status
+    NSLog("[PreFlight] gemini=%@ cds=%@ backend=%@ (%@)",
+          status.geminiKeyPresent ? "OK" : "MISSING",
+          status.cdsKeyPresent ? "OK" : "MISSING",
+          status.backendReachable ? "OK" : "DOWN",
+          status.statusMessage)
   }
 
   // MARK: - Connection check
@@ -354,6 +422,28 @@ class PABackendBridge: ObservableObject {
     isPredicting = true
     _ = await callComprehensiveAnalysis(text: text)
     isPredicting = false
+  }
+
+  // MARK: - Demo Mode
+
+  enum DemoScenario: String, CaseIterable {
+    case classicACS = "classic_acs"
+    case lowRisk = "low_risk"
+    case highRiskSafety = "high_risk_safety"
+  }
+
+  /// Load a pre-baked ComprehensiveResponse from a bundled JSON fixture.
+  func loadDemoData(_ scenario: DemoScenario) {
+    guard let url = Bundle.main.url(forResource: "demo_\(scenario.rawValue)", withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let response = try? JSONDecoder().decode(ComprehensiveResponse.self, from: data) else {
+      analysisError = "Demo fixture not found: \(scenario.rawValue)"
+      NSLog("[Demo] Failed to load fixture: demo_%@.json", scenario.rawValue)
+      return
+    }
+    resetSession()
+    applyComprehensiveResult(response)
+    NSLog("[Demo] Loaded scenario: %@", scenario.rawValue)
   }
 
   // MARK: - Full Summary

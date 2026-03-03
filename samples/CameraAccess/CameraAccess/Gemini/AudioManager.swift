@@ -1,8 +1,17 @@
 import AVFoundation
 import Foundation
 
+enum AudioRouteStatus: String {
+  case bluetoothGlasses = "Glasses"
+  case phoneMic = "Phone mic"
+  case unknown = "Unknown"
+}
+
 class AudioManager {
   var onAudioCaptured: ((Data) -> Void)?
+
+  /// Current audio input route (Bluetooth or phone mic).
+  private(set) var audioRoute: AudioRouteStatus = .unknown
 
   private let audioEngine = AVAudioEngine()
   private let playerNode = AVAudioPlayerNode()
@@ -45,7 +54,13 @@ class AudioManager {
     try session.setPreferredSampleRate(GeminiConfig.inputAudioSampleRate)
     try session.setPreferredIOBufferDuration(0.064)
     try session.setActive(true)
-    NSLog("[Audio] Session mode: %@", useBluetoothGlasses ? "Bluetooth glasses" : "iPhone speaker")
+
+    // Detect actual audio route after activation
+    let currentRoute = session.currentRoute
+    let inputPorts = currentRoute.inputs
+    let hasBluetooth = inputPorts.contains { $0.portType == .bluetoothHFP || $0.portType == .bluetoothA2DP || $0.portType == .bluetoothLE }
+    audioRoute = hasBluetooth ? .bluetoothGlasses : .phoneMic
+    NSLog("[Audio] Session mode: %@, route: %@", useBluetoothGlasses ? "Bluetooth glasses" : "iPhone speaker", audioRoute.rawValue)
   }
 
   func startCapture() throws {

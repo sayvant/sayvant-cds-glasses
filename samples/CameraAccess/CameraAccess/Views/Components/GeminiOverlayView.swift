@@ -10,7 +10,22 @@ struct GeminiStatusBar: View {
 
       // PA Backend connection pill
       StatusPill(color: paBackendStatusColor, text: paBackendStatusText)
+
+      // Audio route pill
+      StatusPill(color: audioRouteColor, text: audioRouteText)
     }
+  }
+
+  private var audioRouteColor: Color {
+    switch geminiVM.audioRoute {
+    case .bluetoothGlasses: return .green
+    case .phoneMic: return .yellow
+    case .unknown: return .gray
+    }
+  }
+
+  private var audioRouteText: String {
+    geminiVM.audioRoute.rawValue
   }
 
   private var geminiStatusColor: Color {

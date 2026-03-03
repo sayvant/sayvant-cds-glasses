@@ -11,6 +11,8 @@ final class SettingsManager {
     case paBackendURL
     case cdsAPIKey
     case paFrontendURL
+    case demoModeAlways
+    case hasCompletedOnboarding
   }
 
   private init() {}
@@ -44,10 +46,22 @@ final class SettingsManager {
     set { defaults.set(newValue, forKey: Key.paFrontendURL.rawValue) }
   }
 
+  // MARK: - Demo & Onboarding
+
+  var demoModeAlways: Bool {
+    get { defaults.bool(forKey: Key.demoModeAlways.rawValue) }
+    set { defaults.set(newValue, forKey: Key.demoModeAlways.rawValue) }
+  }
+
+  var hasCompletedOnboarding: Bool {
+    get { defaults.bool(forKey: Key.hasCompletedOnboarding.rawValue) }
+    set { defaults.set(newValue, forKey: Key.hasCompletedOnboarding.rawValue) }
+  }
+
   // MARK: - Reset
 
   func resetAll() {
-    for key in [Key.geminiAPIKey, .geminiSystemPrompt_v2, .paBackendURL, .cdsAPIKey, .paFrontendURL] {
+    for key in [Key.geminiAPIKey, .geminiSystemPrompt_v2, .paBackendURL, .cdsAPIKey, .paFrontendURL, .demoModeAlways, .hasCompletedOnboarding] {
       defaults.removeObject(forKey: key.rawValue)
     }
   }

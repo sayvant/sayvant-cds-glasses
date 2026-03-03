@@ -8,6 +8,7 @@ struct SettingsView: View {
   @State private var paBackendURL: String = ""
   @State private var cdsAPIKey: String = ""
   @State private var geminiSystemPrompt: String = ""
+  @State private var demoModeAlways: Bool = false
   @State private var showResetConfirmation = false
 
   var body: some View {
@@ -54,6 +55,10 @@ struct SettingsView: View {
           }
         }
 
+        Section(header: Text("Demo"), footer: Text("Use bundled sample data instead of live backend calls.")) {
+          Toggle("Always use demo data", isOn: $demoModeAlways)
+        }
+
         Section {
           Button("Reset to Defaults") {
             showResetConfirmation = true
@@ -97,6 +102,7 @@ struct SettingsView: View {
     geminiSystemPrompt = settings.geminiSystemPrompt
     paBackendURL = settings.paBackendURL
     cdsAPIKey = settings.cdsAPIKey
+    demoModeAlways = settings.demoModeAlways
   }
 
   private func save() {
@@ -104,5 +110,6 @@ struct SettingsView: View {
     settings.geminiSystemPrompt = geminiSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.paBackendURL = paBackendURL.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.cdsAPIKey = cdsAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    settings.demoModeAlways = demoModeAlways
   }
 }

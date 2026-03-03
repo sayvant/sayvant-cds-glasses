@@ -2,12 +2,12 @@ import Foundation
 
 // MARK: - /full_summary Response
 
-struct EncounterSummaryResponse: Decodable {
+struct EncounterSummaryResponse: Codable {
   let format: String
   let summary: EncounterSummaryData?
 }
 
-struct EncounterSummaryData: Decodable {
+struct EncounterSummaryData: Codable {
   let encounter_id: String?
   let prediction: SummaryPrediction?
   let differential: SummaryDifferential?
@@ -16,18 +16,18 @@ struct EncounterSummaryData: Decodable {
   let recommendations: [String]?
 }
 
-struct SummaryPrediction: Decodable {
+struct SummaryPrediction: Codable {
   let acs_probability: Double?
   let risk_band: String?
   let safety_applied: Bool?
 }
 
-struct SummaryDifferential: Decodable {
+struct SummaryDifferential: Codable {
   let ranked_diagnoses: [SummaryDiagnosis]?
   let risk_category: String?
 }
 
-struct SummaryDiagnosis: Decodable, Identifiable {
+struct SummaryDiagnosis: Codable, Identifiable {
   let diagnosis: String
   let probability: Double
 
@@ -35,17 +35,17 @@ struct SummaryDiagnosis: Decodable, Identifiable {
   var probabilityPct: Double { probability * 100 }
 }
 
-struct SummaryGuidance: Decodable {
+struct SummaryGuidance: Codable {
   let completeness: SummaryCompleteness?
   let red_flags_count: Int?
   let questions_remaining: Int?
 }
 
-struct SummaryCompleteness: Decodable {
+struct SummaryCompleteness: Codable {
   let overall_score: Double?
 }
 
-struct SummaryUncertainty: Decodable {
+struct SummaryUncertainty: Codable {
   let uncertainty_level: String?
   let prediction_stability: String?
 }
@@ -67,6 +67,9 @@ struct SavedEncounter: Codable, Identifiable {
   let workupItems: [String]?
   let redFlagCount: Int
   let questionsAsked: Int
+
+  // Rich /full_summary data (optional — may not be present on older encounters)
+  var fullSummary: EncounterSummaryData?
 }
 
 struct DiagnosisSummaryItem: Codable, Identifiable {
@@ -103,6 +106,19 @@ class EncounterStore {
       try data.write(to: storeURL, options: .atomic)
     } catch {
       NSLog("[EncounterStore] Save error: %@", error.localizedDescription)
+    }
+  }
+
+  func update(_ encounter: SavedEncounter) {
+    var encounters = loadAll()
+    if let idx = encounters.firstIndex(where: { $0.id == encounter.id }) {
+      encounters[idx] = encounter
+      do {
+        let data = try JSONEncoder().encode(encounters)
+        try data.write(to: storeURL, options: .atomic)
+      } catch {
+        NSLog("[EncounterStore] Update error: %@", error.localizedDescription)
+      }
     }
   }
 

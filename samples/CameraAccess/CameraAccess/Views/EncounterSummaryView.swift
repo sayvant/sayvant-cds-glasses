@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Post-session encounter summary with collapsible sections and share button.
+/// Post-session encounter summary with collapsible sections, share, and copy buttons.
 struct EncounterSummaryView: View {
   let encounter: SavedEncounter
   @Environment(\.dismiss) private var dismiss
+  @State private var copiedToClipboard = false
 
   private let dateFormatter: DateFormatter = {
     let f = DateFormatter()
@@ -87,6 +88,38 @@ struct EncounterSummaryView: View {
             }
           }
 
+          // Rich summary sections (from /full_summary if available)
+          if let summary = encounter.fullSummary {
+            if let recommendations = summary.recommendations, !recommendations.isEmpty {
+              SummarySection(title: "Recommendations") {
+                ForEach(recommendations, id: \.self) { rec in
+                  HStack(alignment: .top, spacing: 8) {
+                    Circle()
+                      .fill(Color.blue)
+                      .frame(width: 6, height: 6)
+                      .padding(.top, 5)
+                    Text(rec)
+                      .font(.system(size: 14))
+                      .foregroundColor(.white)
+                  }
+                }
+              }
+            }
+
+            if let unc = summary.uncertainty {
+              SummarySection(title: "Uncertainty") {
+                VStack(spacing: 6) {
+                  if let level = unc.uncertainty_level {
+                    MetricRow(label: "Level", value: level.capitalized)
+                  }
+                  if let stability = unc.prediction_stability {
+                    MetricRow(label: "Stability", value: stability.capitalized)
+                  }
+                }
+              }
+            }
+          }
+
           // Quality Metrics
           SummarySection(title: "Quality Metrics") {
             VStack(spacing: 6) {
@@ -115,8 +148,22 @@ struct EncounterSummaryView: View {
           Button("Done") { dismiss() }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
-          ShareLink(item: buildShareText()) {
-            Image(systemName: "square.and.arrow.up")
+          HStack(spacing: 12) {
+            // Copy to clipboard
+            Button {
+              UIPasteboard.general.string = buildShareText()
+              copiedToClipboard = true
+              DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                copiedToClipboard = false
+              }
+            } label: {
+              Image(systemName: copiedToClipboard ? "checkmark" : "doc.on.doc")
+            }
+
+            // Share
+            ShareLink(item: buildShareText()) {
+              Image(systemName: "square.and.arrow.up")
+            }
           }
         }
       }
@@ -125,33 +172,32 @@ struct EncounterSummaryView: View {
   }
 
   private func buildShareText() -> String {
-    var text = "CDS Encounter Summary\n"
-    text += "\(dateFormatter.string(from: encounter.date))\n\n"
+    var text = "CDS Analysis \u{2014} \(dateFormatter.string(from: encounter.date))\n"
 
     if let pct = encounter.acsRiskPct, let band = encounter.riskBand {
       text += "ACS Risk: \(Int(pct))% (\(band))\n"
     }
 
-    if let diffs = encounter.differentialSummary {
-      text += "\nDifferential:\n"
-      for dx in diffs {
-        text += "  \(dx.diagnosis): \(Int(dx.probabilityPct))%\n"
-      }
+    if let diffs = encounter.differentialSummary, !diffs.isEmpty {
+      text += "Top Dx: \(diffs.map { "\($0.diagnosis) (\(Int($0.probabilityPct))%)" }.joined(separator: ", "))\n"
     }
 
     if let workup = encounter.workupItems, !workup.isEmpty {
-      text += "\nWorkup:\n"
-      for item in workup {
-        text += "  - \(item)\n"
-      }
+      text += "Workup: \(workup.joined(separator: ", "))\n"
     }
 
     if let disposition = encounter.disposition {
-      text += "\nDisposition: \(disposition)\n"
+      text += "Disposition: \(disposition)\n"
     }
 
     if let score = encounter.completenessScore {
-      text += "\nCompleteness: \(Int(score))%\n"
+      text += "Completeness: \(Int(score))%\n"
+    }
+
+    text += "Red Flags: \(encounter.redFlagCount)\n"
+
+    if !encounter.transcript.isEmpty {
+      text += "\n--- Transcript ---\n\(encounter.transcript)\n"
     }
 
     return text
@@ -215,6 +261,7 @@ private struct MetricRow: View {
 struct PastEncountersView: View {
   @State private var encounters: [SavedEncounter] = []
   @State private var selectedEncounter: SavedEncounter?
+  @State private var replayEncounter: SavedEncounter?
   @Environment(\.dismiss) private var dismiss
 
   private let dateFormatter: DateFormatter = {
@@ -258,10 +305,32 @@ struct PastEncountersView: View {
                         .cornerRadius(4)
                     }
                   }
-                  if let dx = enc.topDiagnosis {
-                    Text(dx)
-                      .font(.system(size: 12))
-                      .foregroundColor(Color(white: 0.5))
+                  HStack {
+                    if let dx = enc.topDiagnosis {
+                      Text(dx)
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(white: 0.5))
+                    }
+                    Spacer()
+                    // Replay button
+                    if !enc.transcript.isEmpty {
+                      Button {
+                        replayEncounter = enc
+                      } label: {
+                        HStack(spacing: 4) {
+                          Image(systemName: "play.fill")
+                            .font(.system(size: 9))
+                          Text("Replay")
+                            .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(.cyan)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.cyan.opacity(0.12))
+                        .cornerRadius(6)
+                      }
+                      .buttonStyle(.plain)
+                    }
                   }
                 }
               }
@@ -291,6 +360,9 @@ struct PastEncountersView: View {
       }
       .sheet(item: $selectedEncounter) { enc in
         EncounterSummaryView(encounter: enc)
+      }
+      .fullScreenCover(item: $replayEncounter) { enc in
+        ReplaySessionView(encounter: enc)
       }
     }
   }

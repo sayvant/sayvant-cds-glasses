@@ -26,7 +26,7 @@ struct TroponinCard: View {
   }
 }
 
-// MARK: - Disposition Card
+// MARK: - Disposition Card (with threshold visualization)
 
 struct DispositionCard: View {
   let disposition: DispositionPrediction
@@ -53,19 +53,84 @@ struct DispositionCard: View {
           .foregroundColor(color)
         Spacer()
       }
-      CDSProgressBar(value: disposition.probability, color: color)
+
+      // Threshold visualization
+      dispositionThresholdBar
+
+      // Threshold labels
+      HStack(spacing: 0) {
+        Text("Discharge")
+          .font(.system(size: 9, weight: .medium))
+          .foregroundColor(.green.opacity(0.7))
+        Spacer()
+        Text("Observe")
+          .font(.system(size: 9, weight: .medium))
+          .foregroundColor(.orange.opacity(0.7))
+        Spacer()
+        Text("Admit")
+          .font(.system(size: 9, weight: .medium))
+          .foregroundColor(.red.opacity(0.7))
+      }
     }
     .cdsCard(accent: color)
   }
+
+  /// Bar showing current probability plotted against admit/observe thresholds.
+  private var dispositionThresholdBar: some View {
+    GeometryReader { geo in
+      let width = geo.size.width
+      let admitX = width * CGFloat(disposition.thresholds.admit)
+      let observeX = width * CGFloat(disposition.thresholds.observe)
+      let currentX = width * CGFloat(min(max(disposition.probability, 0), 1))
+
+      ZStack(alignment: .leading) {
+        // Background zones
+        HStack(spacing: 0) {
+          Rectangle()
+            .fill(Color.green.opacity(0.15))
+            .frame(width: observeX)
+          Rectangle()
+            .fill(Color.orange.opacity(0.15))
+            .frame(width: admitX - observeX)
+          Rectangle()
+            .fill(Color.red.opacity(0.15))
+        }
+
+        // Threshold lines
+        Rectangle()
+          .fill(Color.orange.opacity(0.6))
+          .frame(width: 1.5)
+          .offset(x: observeX)
+        Rectangle()
+          .fill(Color.red.opacity(0.6))
+          .frame(width: 1.5)
+          .offset(x: admitX)
+
+        // Current probability marker
+        Circle()
+          .fill(color)
+          .frame(width: 10, height: 10)
+          .shadow(color: color.opacity(0.6), radius: 4)
+          .offset(x: currentX - 5)
+      }
+    }
+    .frame(height: 12)
+    .cornerRadius(6)
+    .clipped()
+  }
 }
 
-// MARK: - Feature Attribution Card
+// MARK: - Feature Attribution Card (improved with summary line)
 
 struct FeatureAttributionCard: View {
   let contributions: [FeatureContribution]
 
   private var topFeatures: [FeatureContribution] {
     Array(contributions.sorted { abs($0.weight) > abs($1.weight) }.prefix(5))
+  }
+
+  private var top3: [FeatureContribution] {
+    Array(topFeatures.prefix(3))
   }
 
   private var maxWeight: Double {
@@ -76,15 +141,26 @@ struct FeatureAttributionCard: View {
     if !contributions.isEmpty {
       VStack(alignment: .leading, spacing: 8) {
         SectionHeader(title: "TOP CONTRIBUTORS")
-        ForEach(topFeatures) { fc in
+
+        // One-line summary of top 3 drivers
+        if !top3.isEmpty {
+          Text("Driven by: \(top3.map { formatFeatureName($0.feature) }.joined(separator: ", "))")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(Color(white: 0.7))
+            .padding(.bottom, 2)
+        }
+
+        ForEach(Array(topFeatures.enumerated()), id: \.element.id) { index, fc in
+          let isTop3 = index < 3
+
           HStack(spacing: 8) {
             Text(fc.direction == "positive" ? "+" : "-")
-              .font(.system(size: 14, weight: .bold, design: .monospaced))
+              .font(.system(size: isTop3 ? 16 : 14, weight: .bold, design: .monospaced))
               .foregroundColor(fc.direction == "positive" ? .red : .green)
               .frame(width: 16)
-            Text(fc.feature.replacingOccurrences(of: "_", with: " "))
-              .font(.system(size: 14, weight: .medium))
-              .foregroundColor(.white)
+            Text(formatFeatureName(fc.feature))
+              .font(.system(size: isTop3 ? 15 : 14, weight: isTop3 ? .semibold : .medium))
+              .foregroundColor(isTop3 ? .white : Color(white: 0.5))
               .lineLimit(1)
             Spacer()
             // Weight bar
@@ -93,19 +169,24 @@ struct FeatureAttributionCard: View {
               HStack {
                 Spacer()
                 RoundedRectangle(cornerRadius: 2)
-                  .fill(fc.direction == "positive" ? Color.red.opacity(0.6) : Color.green.opacity(0.6))
+                  .fill((fc.direction == "positive" ? Color.red : Color.green).opacity(isTop3 ? 0.6 : 0.25))
                   .frame(width: barWidth, height: 14)
               }
             }
             .frame(width: 60, height: 14)
             Text(String(format: "%+.2f", fc.weight))
               .font(.system(size: 12, weight: .medium, design: .monospaced))
-              .foregroundColor(Color(white: 0.5))
+              .foregroundColor(isTop3 ? Color(white: 0.6) : Color(white: 0.35))
               .frame(width: 50, alignment: .trailing)
           }
         }
       }
       .cdsCard(accent: .gray)
     }
+  }
+
+  private func formatFeatureName(_ name: String) -> String {
+    name.replacingOccurrences(of: "has_", with: "")
+        .replacingOccurrences(of: "_", with: " ")
   }
 }

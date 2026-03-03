@@ -6,15 +6,31 @@ import SwiftUI
 struct CDSSessionView: View {
   @StateObject private var geminiVM = GeminiSessionViewModel()
   @State private var showSettings = false
+  @State private var showOnboarding = false
 
   var body: some View {
     CDSSessionContent(
       geminiVM: geminiVM,
       bridge: geminiVM.paBackendBridge,
-      showSettings: $showSettings
+      showSettings: $showSettings,
+      showOnboarding: $showOnboarding
     )
     .sheet(isPresented: $showSettings) {
       SettingsView()
+    }
+    .sheet(isPresented: $showOnboarding) {
+      OnboardingView()
+    }
+    .onAppear {
+      // Run pre-flight check on launch
+      Task { await geminiVM.paBackendBridge.runPreFlightCheck() }
+
+      // Show onboarding if first launch and no keys configured
+      if !SettingsManager.shared.hasCompletedOnboarding
+          && !GeminiConfig.isConfigured
+          && !GeminiConfig.isPABackendConfigured {
+        showOnboarding = true
+      }
     }
   }
 }
@@ -26,15 +42,18 @@ private struct CDSSessionContent: View {
   @ObservedObject var geminiVM: GeminiSessionViewModel
   @ObservedObject var bridge: PABackendBridge
   @Binding var showSettings: Bool
+  @Binding var showOnboarding: Bool
 
   @State private var showPastEncounters = false
   @State private var showEncounterSummary: SavedEncounter?
   @State private var manualText = ""
   @State private var isManualAnalyzing = false
+  @State private var isDemoMode = false
 
   private var prediction: PredictResponse? { bridge.predictionResult }
   private var comprehensive: ComprehensiveResponse? { bridge.comprehensiveResult }
   private var isActive: Bool { geminiVM.isGeminiActive }
+  private var preflight: PreFlightStatus { bridge.preFlightStatus }
 
   var body: some View {
     ZStack {
@@ -43,14 +62,11 @@ private struct CDSSessionContent: View {
       if isActive {
         activeSessionView
       } else if isManualAnalyzing || comprehensive != nil {
-        // Show results from manual text analysis
         manualResultsView
       } else {
         preSessionView
       }
     }
-    // Encounter summary sheet lives at top level so it survives
-    // the isActive → false transition when session ends
     .sheet(item: $showEncounterSummary) { encounter in
       EncounterSummaryView(encounter: encounter)
     }
@@ -71,31 +87,51 @@ private struct CDSSessionContent: View {
           .font(.system(size: 20, weight: .medium))
           .foregroundColor(Color(white: 0.4))
 
+        // Pre-flight status indicator
+        preFlightIndicator
+
         // Resume previous session
         if bridge.hasResumableState {
-          VStack(spacing: 8) {
-            Button {
-              bridge.resumeFromSavedState()
-              Task { await geminiVM.startSession() }
-            } label: {
-              HStack(spacing: 8) {
-                Image(systemName: "arrow.counterclockwise")
-                  .font(.system(size: 14))
-                Text("Resume Previous Session")
-                  .font(.system(size: 14, weight: .medium))
-              }
-              .foregroundColor(.orange)
-              .padding(.vertical, 10)
-              .padding(.horizontal, 20)
-              .background(Color.orange.opacity(0.15))
-              .cornerRadius(10)
+          Button {
+            bridge.resumeFromSavedState()
+            Task { await geminiVM.startSession() }
+          } label: {
+            HStack(spacing: 8) {
+              Image(systemName: "arrow.counterclockwise")
+                .font(.system(size: 14))
+              Text("Resume Previous Session")
+                .font(.system(size: 14, weight: .medium))
             }
+            .foregroundColor(.orange)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 20)
+            .background(Color.orange.opacity(0.15))
+            .cornerRadius(10)
           }
-          .padding(.top, 8)
         }
       }
 
       Spacer()
+
+      // Demo mode button
+      Button {
+        isDemoMode = true
+        bridge.loadDemoData(.classicACS)
+      } label: {
+        HStack(spacing: 8) {
+          Image(systemName: "play.rectangle.fill")
+            .font(.system(size: 16))
+          Text("Try Demo")
+            .font(.system(size: 16, weight: .semibold))
+        }
+        .foregroundColor(.cyan)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(Color.cyan.opacity(0.12))
+        .cornerRadius(12)
+      }
+      .padding(.horizontal, 24)
+      .padding(.bottom, 8)
 
       // Manual text input
       manualTextInput
@@ -120,6 +156,37 @@ private struct CDSSessionContent: View {
     }
     .sheet(isPresented: $showPastEncounters) {
       PastEncountersView()
+    }
+  }
+
+  // MARK: - Pre-Flight Indicator
+
+  private var preFlightIndicator: some View {
+    Button {
+      Task { await bridge.runPreFlightCheck() }
+    } label: {
+      HStack(spacing: 8) {
+        Circle()
+          .fill(preflightDotColor)
+          .frame(width: 10, height: 10)
+        Text(preflight.statusMessage)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundColor(Color(white: 0.5))
+      }
+      .padding(.vertical, 8)
+      .padding(.horizontal, 16)
+      .background(Color(white: 0.08))
+      .cornerRadius(20)
+    }
+    .padding(.top, 8)
+  }
+
+  private var preflightDotColor: Color {
+    switch preflight.overallState {
+    case .ready: return .green
+    case .partial: return .yellow
+    case .error: return .red
+    case .notConfigured: return .gray
     }
   }
 
@@ -163,6 +230,7 @@ private struct CDSSessionContent: View {
       Button {
         guard !manualText.isEmpty else { return }
         isManualAnalyzing = true
+        isDemoMode = false
         Task {
           await bridge.analyzeText(manualText)
           isManualAnalyzing = false
@@ -181,10 +249,10 @@ private struct CDSSessionContent: View {
         .foregroundColor(.white)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(manualText.isEmpty ? Color.gray.opacity(0.3) : Color.blue.opacity(0.8))
+        .background(analyzeButtonDisabled ? Color.gray.opacity(0.3) : Color.blue.opacity(0.8))
         .cornerRadius(12)
       }
-      .disabled(manualText.isEmpty || isManualAnalyzing)
+      .disabled(analyzeButtonDisabled)
       .padding(.horizontal, 24)
 
       // Show analysis error if decode/network fails
@@ -200,30 +268,69 @@ private struct CDSSessionContent: View {
     }
   }
 
+  private var analyzeButtonDisabled: Bool {
+    manualText.isEmpty || isManualAnalyzing
+  }
+
   // MARK: - Manual Results View
 
   private var manualResultsView: some View {
     VStack(spacing: 0) {
+      // Demo mode banner
+      if isDemoMode {
+        HStack(spacing: 6) {
+          Image(systemName: "play.rectangle.fill")
+            .font(.system(size: 12))
+          Text("DEMO MODE")
+            .font(.system(size: 11, weight: .bold))
+            .tracking(1)
+          Text("using sample data")
+            .font(.system(size: 11))
+        }
+        .foregroundColor(.cyan)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(Color.cyan.opacity(0.1))
+      }
+
       statusBar
       cardStack
       Spacer(minLength: 0)
 
-      Button {
-        bridge.resetSession()
-        manualText = ""
-        isManualAnalyzing = false
-      } label: {
-        HStack(spacing: 8) {
-          Image(systemName: "arrow.left")
-            .font(.system(size: 16))
-          Text("New Analysis")
-            .font(.system(size: 16, weight: .semibold))
+      // Share + New Analysis buttons
+      HStack(spacing: 12) {
+        ShareLink(item: buildShareText()) {
+          HStack(spacing: 6) {
+            Image(systemName: "square.and.arrow.up")
+              .font(.system(size: 14))
+            Text("Share")
+              .font(.system(size: 14, weight: .semibold))
+          }
+          .foregroundColor(.white)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 14)
+          .background(Color(white: 0.2))
+          .cornerRadius(14)
         }
-        .foregroundColor(.white)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(Color.blue.opacity(0.8))
-        .cornerRadius(14)
+
+        Button {
+          bridge.resetSession()
+          manualText = ""
+          isManualAnalyzing = false
+          isDemoMode = false
+        } label: {
+          HStack(spacing: 8) {
+            Image(systemName: "arrow.left")
+              .font(.system(size: 16))
+            Text("New Analysis")
+              .font(.system(size: 16, weight: .semibold))
+          }
+          .foregroundColor(.white)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 14)
+          .background(Color.blue.opacity(0.8))
+          .cornerRadius(14)
+        }
       }
       .padding(.horizontal, 24)
       .padding(.bottom, 16)
@@ -428,7 +535,7 @@ private struct CDSSessionContent: View {
         finalTranscript = transcript
       }
 
-      let encounter = SavedEncounter(
+      var encounter = SavedEncounter(
         id: UUID().uuidString,
         date: Date(),
         transcript: finalTranscript,
@@ -446,9 +553,65 @@ private struct CDSSessionContent: View {
       )
       EncounterStore.shared.save(encounter)
       showEncounterSummary = encounter
+
+      // Fetch rich /full_summary in the background (updates encounter async)
+      let capturedBridge = bridge
+      Task {
+        if let summaryResponse = await capturedBridge.fetchFullSummary(text: finalTranscript),
+           let summaryData = summaryResponse.summary {
+          encounter.fullSummary = summaryData
+          EncounterStore.shared.update(encounter)
+          NSLog("[EndSession] Rich summary saved for encounter %@", encounter.id)
+        }
+      }
     }
 
     geminiVM.stopSession()
+  }
+
+  // MARK: - Share Text Builder
+
+  private func buildShareText() -> String {
+    var text = "CDS Analysis\n"
+    let df = DateFormatter()
+    df.dateStyle = .medium
+    df.timeStyle = .short
+    text += "\(df.string(from: Date()))\n\n"
+
+    if let pred = prediction {
+      text += "ACS Risk: \(Int(pred.probabilityPct))% (\(pred.band))"
+      text += " | 95% CI: \(pred.confidence_interval.displayText)"
+      text += "\n"
+    }
+
+    if let diffs = comprehensive?.differential.ranked_diagnoses.prefix(5) {
+      text += "\nTop Dx: "
+      text += diffs.map { "\($0.diagnosis) (\(Int($0.probabilityPct))%)" }.joined(separator: ", ")
+      text += "\n"
+    }
+
+    if let workup = comprehensive?.recommended_workup, !workup.isEmpty {
+      text += "\nWorkup: \(workup.joined(separator: ", "))\n"
+    }
+
+    if let disp = prediction?.disposition_prediction {
+      text += "\nDisposition: \(disp.recommendation) (\(Int(disp.probabilityValue))%)\n"
+    }
+
+    let score = bridge.completenessScore
+    if score > 0 {
+      text += "\nCompleteness: \(Int(score))%"
+      if let missing = comprehensive?.guidance.completeness.missing_elements, !missing.isEmpty {
+        text += " -- missing \(missing.prefix(3).joined(separator: ", "))"
+      }
+      text += "\n"
+    }
+
+    if !bridge.redFlags.isEmpty {
+      text += "\nRed Flags: \(bridge.redFlags.count) (\(bridge.redFlags.map(\.message).joined(separator: "; ")))\n"
+    }
+
+    return text
   }
 
   @ViewBuilder

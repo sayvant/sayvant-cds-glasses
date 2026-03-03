@@ -12,6 +12,7 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var transcriptEntries: [TranscriptEntry] = []
   @Published var toolCallStatus: ToolCallStatus = .idle
   @Published var paBackendConnectionState: PABackendConnectionState = .notConfigured
+  @Published var audioRoute: AudioRouteStatus = .unknown
 
   private let geminiService = GeminiLiveService()
   let paBackendBridge = PABackendBridge()
@@ -139,6 +140,7 @@ class GeminiSessionViewModel: ObservableObject {
         self.isModelSpeaking = self.geminiService.isModelSpeaking
         self.toolCallStatus = self.paBackendBridge.lastToolCallStatus
         self.paBackendConnectionState = self.paBackendBridge.connectionState
+        self.audioRoute = self.audioManager.audioRoute
       }
     }
 

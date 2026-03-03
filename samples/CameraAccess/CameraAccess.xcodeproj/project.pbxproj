@@ -39,6 +39,11 @@
 		F3F3F3F300000002TMLECARD /* TimelineCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F3F3F300000001TMLECARD /* TimelineCard.swift */; };
 		F4F4F4F400000002TRNSPANE /* TranscriptPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4F4F4F400000001TRNSPANE /* TranscriptPane.swift */; };
 		F5F5F5F500000002ENCSMVW0 /* EncounterSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5F5F500000001ENCSMVW0 /* EncounterSummaryView.swift */; };
+		G1G1G1G100000002ONBOARD0 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G1G1G1G100000001ONBOARD0 /* OnboardingView.swift */; };
+		G2G2G2G200000002REPLAY00 /* ReplaySessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G2G2G2G200000001REPLAY00 /* ReplaySessionView.swift */; };
+		G3G3G3G300000002DEMOACS0 /* demo_classic_acs.json in Resources */ = {isa = PBXBuildFile; fileRef = G3G3G3G300000001DEMOACS0 /* demo_classic_acs.json */; };
+		G4G4G4G400000002DEMOLOW0 /* demo_low_risk.json in Resources */ = {isa = PBXBuildFile; fileRef = G4G4G4G400000001DEMOLOW0 /* demo_low_risk.json */; };
+		G5G5G5G500000002DEMOHIR0 /* demo_high_risk_safety.json in Resources */ = {isa = PBXBuildFile; fileRef = G5G5G5G500000001DEMOHIR0 /* demo_high_risk_safety.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,6 +107,11 @@
 		F3F3F3F300000001TMLECARD /* TimelineCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineCard.swift; sourceTree = "<group>"; };
 		F4F4F4F400000001TRNSPANE /* TranscriptPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptPane.swift; sourceTree = "<group>"; };
 		F5F5F5F500000001ENCSMVW0 /* EncounterSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncounterSummaryView.swift; sourceTree = "<group>"; };
+		G1G1G1G100000001ONBOARD0 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		G2G2G2G200000001REPLAY00 /* ReplaySessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplaySessionView.swift; sourceTree = "<group>"; };
+		G3G3G3G300000001DEMOACS0 /* demo_classic_acs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo_classic_acs.json; sourceTree = "<group>"; };
+		G4G4G4G400000001DEMOLOW0 /* demo_low_risk.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo_low_risk.json; sourceTree = "<group>"; };
+		G5G5G5G500000001DEMOHIR0 /* demo_high_risk_safety.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo_high_risk_safety.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -153,6 +163,8 @@
 				8FFD5FF42E8422580035E446 /* Components */,
 				B1B1B1B100000001CDSSVIEW /* CDSSessionView.swift */,
 				F5F5F5F500000001ENCSMVW0 /* EncounterSummaryView.swift */,
+				G1G1G1G100000001ONBOARD0 /* OnboardingView.swift */,
+				G2G2G2G200000001REPLAY00 /* ReplaySessionView.swift */,
 				8FFD605F2E84A2F70035E446 /* MainAppView.swift */,
 			);
 			path = Views;
@@ -163,6 +175,7 @@
 			children = (
 				D7D7D7D700000001MODELS00 /* Models */,
 				9DD894B12F4047630090B9B9 /* Settings */,
+				G6G6G6G600000001DEMOFXTR /* DemoFixtures */,
 				9DD6CAAD2F3C426600ED7098 /* Secrets.swift */,
 				9DD6CAAE2F3C426600ED7098 /* Secrets.swift.example */,
 				A1B2C3D42F0A000300000001 /* Gemini */,
@@ -235,6 +248,16 @@
 				A1B2C3D42F0A000100000004 /* GeminiSessionViewModel.swift */,
 			);
 			path = Gemini;
+			sourceTree = "<group>";
+		};
+		G6G6G6G600000001DEMOFXTR /* DemoFixtures */ = {
+			isa = PBXGroup;
+			children = (
+				G3G3G3G300000001DEMOACS0 /* demo_classic_acs.json */,
+				G4G4G4G400000001DEMOLOW0 /* demo_low_risk.json */,
+				G5G5G5G500000001DEMOHIR0 /* demo_high_risk_safety.json */,
+			);
+			path = DemoFixtures;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -326,6 +349,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				8FD96B8D2E6F0A9800F56AB1 /* Assets.xcassets in Resources */,
+				G3G3G3G300000002DEMOACS0 /* demo_classic_acs.json in Resources */,
+				G4G4G4G400000002DEMOLOW0 /* demo_low_risk.json in Resources */,
+				G5G5G5G500000002DEMOHIR0 /* demo_high_risk_safety.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,6 +400,8 @@
 				F3F3F3F300000002TMLECARD /* TimelineCard.swift in Sources */,
 				F4F4F4F400000002TRNSPANE /* TranscriptPane.swift in Sources */,
 				F5F5F5F500000002ENCSMVW0 /* EncounterSummaryView.swift in Sources */,
+				G1G1G1G100000002ONBOARD0 /* OnboardingView.swift in Sources */,
+				G2G2G2G200000002REPLAY00 /* ReplaySessionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
