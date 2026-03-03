@@ -72,11 +72,30 @@ struct UncertaintyData: Decodable {
   }
 }
 
+/// Uncertainty source — backend returns either plain strings or objects.
 struct UncertaintySource: Decodable, Identifiable {
   let source: String
   let description: String
 
   var id: String { source }
+
+  init(from decoder: Decoder) throws {
+    // Try plain string first (backend returns ["Limited clinical features..."])
+    if let singleValue = try? decoder.singleValueContainer(),
+       let text = try? singleValue.decode(String.self) {
+      self.source = text
+      self.description = text
+      return
+    }
+    // Fall back to keyed object
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.source = try container.decode(String.self, forKey: .source)
+    self.description = try container.decode(String.self, forKey: .description)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case source, description
+  }
 }
 
 // MARK: - Differential

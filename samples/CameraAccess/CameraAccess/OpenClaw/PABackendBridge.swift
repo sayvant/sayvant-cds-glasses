@@ -213,8 +213,25 @@ class PABackendBridge: ObservableObject {
             comprehensive.recommended_workup.count)
 
       return comprehensive
+    } catch let decodingError as DecodingError {
+      let detail: String
+      switch decodingError {
+      case .typeMismatch(let type, let context):
+        detail = "Type mismatch: expected \(type) at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+      case .keyNotFound(let key, let context):
+        detail = "Missing key '\(key.stringValue)' at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+      case .valueNotFound(let type, let context):
+        detail = "Null value for \(type) at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+      case .dataCorrupted(let context):
+        detail = "Data corrupted at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+      @unknown default:
+        detail = decodingError.localizedDescription
+      }
+      analysisError = "Decode: \(detail)"
+      NSLog("[PABackend] decode error: %@", detail)
+      return nil
     } catch {
-      analysisError = "Decode error: \(error.localizedDescription)"
+      analysisError = "Error: \(error.localizedDescription)"
       NSLog("[PABackend] comprehensive error: %@", error.localizedDescription)
       return nil
     }
