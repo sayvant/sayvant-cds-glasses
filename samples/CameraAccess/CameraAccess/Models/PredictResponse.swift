@@ -26,7 +26,12 @@ struct SafetyOverride: Decodable, Identifiable {
 struct ConfidenceInterval: Decodable {
   let lower: Double
   let upper: Double
-  let display: String
+  let display: String?
+
+  /// Formatted display string, falling back to computed if backend omits it.
+  var displayText: String {
+    display ?? "\(Int(lower * 100))%-\(Int(upper * 100))%"
+  }
 }
 
 struct FeatureContribution: Decodable, Identifiable {

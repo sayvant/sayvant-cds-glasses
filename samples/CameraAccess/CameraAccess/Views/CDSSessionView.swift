@@ -186,7 +186,17 @@ private struct CDSSessionContent: View {
       }
       .disabled(manualText.isEmpty || isManualAnalyzing)
       .padding(.horizontal, 24)
-      .padding(.bottom, 12)
+
+      // Show analysis error if decode/network fails
+      if let error = bridge.analysisError {
+        Text(error)
+          .font(.system(size: 12))
+          .foregroundColor(.red)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 24)
+      }
+
+      Spacer().frame(height: 12)
     }
   }
 

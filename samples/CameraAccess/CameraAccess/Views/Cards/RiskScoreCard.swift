@@ -18,15 +18,15 @@ struct RiskScoreCard: View {
             showUncertaintyDetail.toggle()
           } label: {
             HStack(spacing: 4) {
-              Image(systemName: stabilityIcon(unc.prediction_stability))
+              Image(systemName: stabilityIcon(unc.stabilityLabel))
                 .font(.system(size: 11, weight: .bold))
-              Text(unc.prediction_stability?.capitalized ?? "")
+              Text(unc.stabilityLabel)
                 .font(.system(size: 11, weight: .bold))
             }
-            .foregroundColor(stabilityColor(unc.prediction_stability))
+            .foregroundColor(stabilityColor(unc.stabilityLabel))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(stabilityColor(unc.prediction_stability).opacity(0.15))
+            .background(stabilityColor(unc.stabilityLabel).opacity(0.15))
             .cornerRadius(6)
           }
           .buttonStyle(.plain)
@@ -60,7 +60,7 @@ struct RiskScoreCard: View {
 
       CDSProgressBar(value: prediction.prob, color: bandColor(prediction.band))
 
-      Text("95% CI: \(prediction.confidence_interval.display)")
+      Text("95% CI: \(prediction.confidence_interval.displayText)")
         .font(.system(size: 13, weight: .medium, design: .monospaced))
         .foregroundColor(Color(white: 0.5))
 
@@ -74,7 +74,7 @@ struct RiskScoreCard: View {
                 .foregroundColor(Color(white: 0.5))
               Text(level.uppercased())
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(stabilityColor(unc.prediction_stability))
+                .foregroundColor(stabilityColor(unc.stabilityLabel))
             }
           }
 
@@ -103,8 +103,8 @@ struct RiskScoreCard: View {
     .cdsCard(accent: bandColor(prediction.band))
   }
 
-  private func stabilityIcon(_ stability: String?) -> String {
-    switch stability?.lowercased() {
+  private func stabilityIcon(_ label: String) -> String {
+    switch label.lowercased() {
     case "stable": return "checkmark.circle.fill"
     case "moderate": return "questionmark.circle"
     case "unstable": return "exclamationmark.triangle.fill"
@@ -112,8 +112,8 @@ struct RiskScoreCard: View {
     }
   }
 
-  private func stabilityColor(_ stability: String?) -> Color {
-    switch stability?.lowercased() {
+  private func stabilityColor(_ label: String) -> Color {
+    switch label.lowercased() {
     case "stable": return .green
     case "moderate": return .orange
     case "unstable": return .red

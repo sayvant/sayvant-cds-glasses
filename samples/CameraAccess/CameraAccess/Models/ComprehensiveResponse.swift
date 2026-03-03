@@ -52,16 +52,24 @@ struct UncertaintyData: Decodable {
   let confidence_interval: ConfidenceInterval?
   let calibrated_probability: Double?
   let uncertainty_level: String?
-  let prediction_stability: String?
-  let feature_importance: [UncertaintyFeature]?
+  let prediction_stability: Double?
+  let feature_importance: [String: Double]?
   let uncertainty_sources: [UncertaintySource]?
-}
 
-struct UncertaintyFeature: Decodable, Identifiable {
-  let feature: String
-  let importance: Double
+  /// Stability as a display string.
+  var stabilityLabel: String {
+    guard let s = prediction_stability else { return "Unknown" }
+    if s > 0.7 { return "Stable" }
+    if s > 0.4 { return "Moderate" }
+    return "Unstable"
+  }
 
-  var id: String { feature }
+  /// Feature importance as sorted display items.
+  var sortedFeatures: [(feature: String, importance: Double)] {
+    (feature_importance ?? [:])
+      .sorted { $0.value > $1.value }
+      .map { (feature: $0.key, importance: $0.value) }
+  }
 }
 
 struct UncertaintySource: Decodable, Identifiable {
@@ -145,8 +153,19 @@ struct CategoryScore: Decodable {
   let total: Int?
 
   // The backend returns category_scores as a dict with varying shapes.
-  // Handle both {score, captured, missing, total} and simple numeric values.
+  // Handle both {score, captured, missing, total} objects AND plain numeric values like 40.0.
   init(from decoder: Decoder) throws {
+    // Try plain Double first (backend returns "Pain Characteristics": 40.0)
+    if let singleValue = try? decoder.singleValueContainer(),
+       let numericScore = try? singleValue.decode(Double.self) {
+      self.score = numericScore
+      self.captured = nil
+      self.missing = nil
+      self.total = nil
+      return
+    }
+
+    // Fall back to keyed object
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.score = try container.decodeIfPresent(Double.self, forKey: .score)
     self.captured = try container.decodeIfPresent([String].self, forKey: .captured)

@@ -36,6 +36,9 @@ class PABackendBridge: ObservableObject {
   /// Whether an analysis call is in flight.
   @Published var isPredicting: Bool = false
 
+  /// Last analysis error (displayed to user).
+  @Published var analysisError: String?
+
   /// Full transcript accumulated across the encounter.
   @Published var fullTranscript: String = ""
 
@@ -148,6 +151,7 @@ class PABackendBridge: ObservableObject {
     predictionResult = nil
     comprehensiveResult = nil
     isPredicting = false
+    analysisError = nil
     fullTranscript = ""
     timelineEntries = []
     NSLog("[PABackend] Session reset")
@@ -171,9 +175,12 @@ class PABackendBridge: ObservableObject {
   private func callComprehensiveAnalysis(text: String) async -> ComprehensiveResponse? {
     guard !text.isEmpty else { return nil }
     guard let url = URL(string: "\(GeminiConfig.paBackendURL)/comprehensive_analysis") else {
+      analysisError = "Invalid PA backend URL"
       NSLog("[PABackend] Invalid PA backend URL")
       return nil
     }
+
+    analysisError = nil
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -192,6 +199,7 @@ class PABackendBridge: ObservableObject {
 
       guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        analysisError = "Backend returned HTTP \(code)"
         NSLog("[PABackend] comprehensive_analysis failed: HTTP %d", code)
         return nil
       }
@@ -206,6 +214,7 @@ class PABackendBridge: ObservableObject {
 
       return comprehensive
     } catch {
+      analysisError = "Decode error: \(error.localizedDescription)"
       NSLog("[PABackend] comprehensive error: %@", error.localizedDescription)
       return nil
     }

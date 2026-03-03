@@ -18,7 +18,7 @@ struct TroponinCard: View {
           .foregroundColor(color)
       }
       CDSProgressBar(value: troponin.probability, color: color)
-      Text("95% CI: \(troponin.confidence_interval.display)")
+      Text("95% CI: \(troponin.confidence_interval.displayText)")
         .font(.system(size: 12, weight: .medium, design: .monospaced))
         .foregroundColor(Color(white: 0.4))
     }
