@@ -49,6 +49,7 @@ private struct CDSSessionContent: View {
   @State private var manualText = ""
   @State private var isManualAnalyzing = false
   @State private var isDemoMode = false
+  @State private var isHUDMode = false
 
   private var prediction: PredictResponse? { bridge.predictionResult }
   private var comprehensive: ComprehensiveResponse? { bridge.comprehensiveResult }
@@ -60,11 +61,26 @@ private struct CDSSessionContent: View {
       Color.black.ignoresSafeArea()
 
       if isActive {
-        activeSessionView
+        if isHUDMode {
+          HUDViewport(bridge: bridge, geminiVM: geminiVM)
+        } else {
+          activeSessionView
+        }
       } else if isManualAnalyzing || comprehensive != nil {
-        manualResultsView
+        if isHUDMode {
+          HUDViewport(bridge: bridge, geminiVM: geminiVM)
+        } else {
+          manualResultsView
+        }
       } else {
         preSessionView
+      }
+    }
+    .overlay(alignment: .topTrailing) {
+      if isActive || comprehensive != nil {
+        HUDModeToggle(isHUDMode: $isHUDMode)
+          .padding(.top, 50)
+          .padding(.trailing, 16)
       }
     }
     .sheet(item: $showEncounterSummary) { encounter in
