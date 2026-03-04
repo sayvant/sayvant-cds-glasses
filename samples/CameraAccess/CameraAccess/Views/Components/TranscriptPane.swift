@@ -117,7 +117,7 @@ struct FullTranscriptView: View {
   let entries: [TranscriptEntry]
   @Environment(\.dismiss) private var dismiss
   @State private var searchText = ""
-  @State private var filterSpeaker: Speaker?
+  @State private var filterSpeaker: TranscriptEntry.Speaker?
 
   private let timeFormatter: DateFormatter = {
     let f = DateFormatter()
