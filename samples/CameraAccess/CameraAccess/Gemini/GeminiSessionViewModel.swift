@@ -202,12 +202,12 @@ class GeminiSessionViewModel: ObservableObject {
     // Gemini hasn't decided to call analyze_encounter yet.
     lastAutoAnalyzedLength = 0
     autoAnalysisTask = Task { [weak self] in
-      // Wait 8 seconds before first analysis to accumulate some speech
-      try? await Task.sleep(nanoseconds: 8_000_000_000)
+      // Wait 4 seconds before first analysis to accumulate initial speech
+      try? await Task.sleep(nanoseconds: 4_000_000_000)
       while !Task.isCancelled {
         guard let self else { break }
         let currentLength = self.paBackendBridge.fullTranscript.count
-        let hasNewText = currentLength > self.lastAutoAnalyzedLength + 15 // ~3 words
+        let hasNewText = currentLength > self.lastAutoAnalyzedLength + 10 // ~2 words
         if hasNewText {
           NSLog("[AutoAnalysis] Triggering (transcript: %d chars)", currentLength)
           let didRun = await self.paBackendBridge.runAutoAnalysis()
@@ -215,7 +215,7 @@ class GeminiSessionViewModel: ObservableObject {
             self.lastAutoAnalyzedLength = currentLength
           }
         }
-        try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+        try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
       }
     }
   }
