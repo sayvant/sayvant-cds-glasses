@@ -18,4 +18,12 @@ struct TranscriptEntry: Identifiable, Codable {
     self.text = text
     self.speaker = speaker
   }
+
+  /// Merge new text into an existing entry, preserving original id and timestamp.
+  init(merging text: String, from existing: TranscriptEntry) {
+    self.id = existing.id
+    self.timestamp = existing.timestamp
+    self.text = text
+    self.speaker = existing.speaker
+  }
 }

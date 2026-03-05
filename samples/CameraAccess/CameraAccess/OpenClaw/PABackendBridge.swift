@@ -374,12 +374,15 @@ class PABackendBridge: ObservableObject {
 
   /// Auto-triggered analysis from transcript accumulation (no Gemini tool call).
   /// Updates all published state for real-time card rendering.
-  func runAutoAnalysis() async {
-    guard !isPredicting else { return }
-    guard !fullTranscript.isEmpty else { return }
+  /// Returns true if analysis ran (even if backend errored), false if skipped.
+  @discardableResult
+  func runAutoAnalysis() async -> Bool {
+    guard !isPredicting else { return false }
+    guard !fullTranscript.isEmpty else { return false }
     isPredicting = true
     _ = await callComprehensiveAnalysis(text: fullTranscript)
     isPredicting = false
+    return true
   }
 
   /// Build a structured response string that Gemini will use to generate

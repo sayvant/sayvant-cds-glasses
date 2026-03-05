@@ -72,8 +72,19 @@ class GeminiSessionViewModel: ObservableObject {
           self.aiTranscript = ""
         }
         self.userTranscript += text
-        // Append to transcript log and accumulate in bridge for auto-analysis
-        self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
+        // Accumulate chunks into the last patient entry instead of creating
+        // a new TranscriptEntry for every tiny Gemini transcription fragment.
+        if let lastIdx = self.transcriptEntries.indices.last,
+           self.transcriptEntries[lastIdx].speaker == .patient,
+           Date().timeIntervalSince(self.transcriptEntries[lastIdx].timestamp) < 3.0 {
+          let existing = self.transcriptEntries[lastIdx]
+          self.transcriptEntries[lastIdx] = TranscriptEntry(
+            merging: existing.text + " " + text,
+            from: existing
+          )
+        } else {
+          self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
+        }
         self.paBackendBridge.appendTranscript(text)
       }
     }
@@ -198,9 +209,11 @@ class GeminiSessionViewModel: ObservableObject {
         let currentLength = self.paBackendBridge.fullTranscript.count
         let hasNewText = currentLength > self.lastAutoAnalyzedLength + 15 // ~3 words
         if hasNewText {
-          self.lastAutoAnalyzedLength = currentLength
           NSLog("[AutoAnalysis] Triggering (transcript: %d chars)", currentLength)
-          await self.paBackendBridge.runAutoAnalysis()
+          let didRun = await self.paBackendBridge.runAutoAnalysis()
+          if didRun {
+            self.lastAutoAnalyzedLength = currentLength
+          }
         }
         try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
       }
