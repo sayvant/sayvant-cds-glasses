@@ -106,7 +106,7 @@ class AudioManager {
     }
 
     var tapCount = 0
-    inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputNativeFormat) { [weak self] buffer, _ in
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputNativeFormat) { [weak self] buffer, _ in
       guard let self else { return }
 
       tapCount += 1

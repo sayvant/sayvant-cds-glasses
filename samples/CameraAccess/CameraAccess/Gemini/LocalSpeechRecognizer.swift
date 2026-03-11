@@ -47,11 +47,18 @@ class LocalSpeechRecognizer: ObservableObject {
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = true // On-device = lowest latency
-        // iOS 16+: add punctuation if available
-        if #available(iOS 16, *) {
-            request.addsPunctuation = true
+        // Prefer on-device but don't require it — falls back to server if model not downloaded
+        if recognizer?.supportsOnDeviceRecognition == true {
+            request.requiresOnDeviceRecognition = true
+            NSLog("[LocalSTT] Using on-device recognition")
+        } else {
+            NSLog("[LocalSTT] On-device not available, using server recognition")
         }
+        if #available(iOS 16, *) {
+            request.addsPunctuation = false // Skip punctuation for lowest latency
+        }
+        // Smaller task hint for faster partial results
+        request.taskHint = .dictation
         self.recognitionRequest = request
         self._requestRef = request
 
@@ -146,10 +153,13 @@ class LocalSpeechRecognizer: ObservableObject {
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = true
-        if #available(iOS 16, *) {
-            request.addsPunctuation = true
+        if recognizer?.supportsOnDeviceRecognition == true {
+            request.requiresOnDeviceRecognition = true
         }
+        if #available(iOS 16, *) {
+            request.addsPunctuation = false
+        }
+        request.taskHint = .dictation
         self.recognitionRequest = request
         self._requestRef = request
         lastFinalText = ""
