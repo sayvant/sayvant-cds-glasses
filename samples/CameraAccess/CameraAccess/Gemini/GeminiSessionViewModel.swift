@@ -18,6 +18,7 @@ class GeminiSessionViewModel: ObservableObject {
   let paBackendBridge = PABackendBridge()
   private var toolCallRouter: ToolCallRouter?
   private let audioManager = AudioManager()
+  let localSTT = LocalSpeechRecognizer()
   private var stateObservation: Task<Void, Never>?
   private var autoAnalysisTask: Task<Void, Never>?
   private var lastAutoAnalyzedLength = 0
@@ -63,29 +64,14 @@ class GeminiSessionViewModel: ObservableObject {
       }
     }
 
+    // Gemini input transcription — still listen but DON'T use for display.
+    // Local STT handles the real-time transcript. Gemini transcription is a
+    // backup and feeds into Gemini's context so its tool calls stay informed.
     geminiService.onInputTranscription = { [weak self] text in
       guard let self else { return }
       Task { @MainActor in
-        // Clear previous turn's text when new patient speech starts
-        if self.userTranscript.isEmpty || self.aiTranscript.isEmpty == false {
-          self.userTranscript = ""
-          self.aiTranscript = ""
-        }
-        self.userTranscript += text
-        // Accumulate chunks into the last patient entry instead of creating
-        // a new TranscriptEntry for every tiny Gemini transcription fragment.
-        if let lastIdx = self.transcriptEntries.indices.last,
-           self.transcriptEntries[lastIdx].speaker == .patient,
-           Date().timeIntervalSince(self.transcriptEntries[lastIdx].timestamp) < 3.0 {
-          let existing = self.transcriptEntries[lastIdx]
-          self.transcriptEntries[lastIdx] = TranscriptEntry(
-            merging: existing.text + " " + text,
-            from: existing
-          )
-        } else {
-          self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
-        }
-        self.paBackendBridge.appendTranscript(text)
+        // No-op for display — local STT handles userTranscript + transcriptEntries.
+        // Gemini still sees this internally for its conversation context.
       }
     }
 
@@ -183,6 +169,12 @@ class GeminiSessionViewModel: ObservableObject {
       return
     }
 
+    // Wire local STT to AudioManager's raw buffer callback
+    audioManager.onRawBufferCaptured = { [weak self] buffer in
+      guard let self else { return }
+      self.localSTT.appendAudioBuffer(buffer)
+    }
+
     // Start mic capture
     do {
       try audioManager.startCapture()
@@ -195,6 +187,35 @@ class GeminiSessionViewModel: ObservableObject {
       connectionState = .disconnected
       return
     }
+
+    // Start local on-device speech recognition — near-instant transcription
+    localSTT.requestAuthorization()
+    localSTT.startRecognizing(
+      onPartial: { [weak self] text in
+        guard let self else { return }
+        // Update display with partial (real-time) text
+        self.userTranscript = text
+      },
+      onFinal: { [weak self] text in
+        guard let self else { return }
+        // Finalized segment — append to transcript entries + PA bridge
+        self.userTranscript = ""
+        if !text.isEmpty {
+          if let lastIdx = self.transcriptEntries.indices.last,
+             self.transcriptEntries[lastIdx].speaker == .patient,
+             Date().timeIntervalSince(self.transcriptEntries[lastIdx].timestamp) < 3.0 {
+            let existing = self.transcriptEntries[lastIdx]
+            self.transcriptEntries[lastIdx] = TranscriptEntry(
+              merging: existing.text + " " + text,
+              from: existing
+            )
+          } else {
+            self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
+          }
+          self.paBackendBridge.appendTranscript(text)
+        }
+      }
+    )
 
     // Start auto-analysis loop: every 10 seconds, if new transcript text has
     // accumulated, send to /comprehensive_analysis for real-time card updates.
@@ -260,11 +281,13 @@ class GeminiSessionViewModel: ObservableObject {
   }
 
   func stopSession() {
+    localSTT.stopRecognizing()
     paBackendBridge.stopAutoSave()
     autoAnalysisTask?.cancel()
     autoAnalysisTask = nil
     toolCallRouter?.cancelAll()
     toolCallRouter = nil
+    audioManager.onRawBufferCaptured = nil
     audioManager.stopCapture()
     geminiService.disconnect()
     stateObservation?.cancel()

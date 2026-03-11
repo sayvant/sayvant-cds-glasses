@@ -9,6 +9,8 @@ enum AudioRouteStatus: String {
 
 class AudioManager {
   var onAudioCaptured: ((Data) -> Void)?
+  /// Raw Float32 buffer callback for local speech recognition (pre-resample).
+  var onRawBufferCaptured: ((AVAudioPCMBuffer) -> Void)?
 
   /// Current audio input route (Bluetooth or phone mic).
   private(set) var audioRoute: AudioRouteStatus = .unknown
@@ -52,7 +54,7 @@ class AudioManager {
       )
     }
     try session.setPreferredSampleRate(GeminiConfig.inputAudioSampleRate)
-    try session.setPreferredIOBufferDuration(0.064)
+    try session.setPreferredIOBufferDuration(0.02) // 20ms for low-latency STT
     try session.setActive(true)
 
     // Detect actual audio route after activation
@@ -108,6 +110,10 @@ class AudioManager {
       guard let self else { return }
 
       tapCount += 1
+
+      // Feed raw buffer to local speech recognizer (native format, no resample)
+      self.onRawBufferCaptured?(buffer)
+
       let pcmData: Data
       let rms: Float
 

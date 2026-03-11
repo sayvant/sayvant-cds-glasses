@@ -44,12 +44,11 @@
 		G3G3G3G300000002DEMOACS0 /* demo_classic_acs.json in Resources */ = {isa = PBXBuildFile; fileRef = G3G3G3G300000001DEMOACS0 /* demo_classic_acs.json */; };
 		G4G4G4G400000002DEMOLOW0 /* demo_low_risk.json in Resources */ = {isa = PBXBuildFile; fileRef = G4G4G4G400000001DEMOLOW0 /* demo_low_risk.json */; };
 		G5G5G5G500000002DEMOHIR0 /* demo_high_risk_safety.json in Resources */ = {isa = PBXBuildFile; fileRef = G5G5G5G500000001DEMOHIR0 /* demo_high_risk_safety.json */; };
-		H2H2H2H200000002CMPLARC0 /* HUDCompletenessArc.swift in Sources */ = {isa = PBXBuildFile; fileRef = H2H2H2H200000001CMPLARC0 /* HUDCompletenessArc.swift */; };
 		H3H3H3H300000002STATDOT0 /* HUDStatusDots.swift in Sources */ = {isa = PBXBuildFile; fileRef = H3H3H3H300000001STATDOT0 /* HUDStatusDots.swift */; };
 		H4H4H4H400000002SAFEOVR0 /* HUDSafetyOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = H4H4H4H400000001SAFEOVR0 /* HUDSafetyOverlay.swift */; };
-		H5H5H5H500000002ASKNROT0 /* HUDAskNextRotator.swift in Sources */ = {isa = PBXBuildFile; fileRef = H5H5H5H500000001ASKNROT0 /* HUDAskNextRotator.swift */; };
 		H6H6H6H600000002MODETGL0 /* HUDModeToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = H6H6H6H600000001MODETGL0 /* HUDModeToggle.swift */; };
 		H7H7H7H700000002HUDVWPT0 /* HUDViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = H7H7H7H700000001HUDVWPT0 /* HUDViewport.swift */; };
+		L1L1L1L100000002LOCSTT0 /* LocalSpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = L1L1L1L100000001LOCSTT0 /* LocalSpeechRecognizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -92,6 +91,7 @@
 		A1B2C3D42F0A000100000001 /* GeminiConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiConfig.swift; sourceTree = "<group>"; };
 		A1B2C3D42F0A000100000002 /* GeminiLiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveService.swift; sourceTree = "<group>"; };
 		A1B2C3D42F0A000100000003 /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
+		L1L1L1L100000001LOCSTT0 /* LocalSpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSpeechRecognizer.swift; sourceTree = "<group>"; };
 		A1B2C3D42F0A000100000004 /* GeminiSessionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiSessionViewModel.swift; sourceTree = "<group>"; };
 		A1B2C3D42F0A000100000005 /* GeminiOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiOverlayView.swift; sourceTree = "<group>"; };
 		B1B1B1B100000001CDSSVIEW /* CDSSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CDSSessionView.swift; sourceTree = "<group>"; };
@@ -118,10 +118,8 @@
 		G3G3G3G300000001DEMOACS0 /* demo_classic_acs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo_classic_acs.json; sourceTree = "<group>"; };
 		G4G4G4G400000001DEMOLOW0 /* demo_low_risk.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo_low_risk.json; sourceTree = "<group>"; };
 		G5G5G5G500000001DEMOHIR0 /* demo_high_risk_safety.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo_high_risk_safety.json; sourceTree = "<group>"; };
-		H2H2H2H200000001CMPLARC0 /* HUDCompletenessArc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDCompletenessArc.swift; sourceTree = "<group>"; };
 		H3H3H3H300000001STATDOT0 /* HUDStatusDots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDStatusDots.swift; sourceTree = "<group>"; };
 		H4H4H4H400000001SAFEOVR0 /* HUDSafetyOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDSafetyOverlay.swift; sourceTree = "<group>"; };
-		H5H5H5H500000001ASKNROT0 /* HUDAskNextRotator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDAskNextRotator.swift; sourceTree = "<group>"; };
 		H6H6H6H600000001MODETGL0 /* HUDModeToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDModeToggle.swift; sourceTree = "<group>"; };
 		H7H7H7H700000001HUDVWPT0 /* HUDViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDViewport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -246,8 +244,6 @@
 		H1H1H1H100000001HUDGRP00 /* HUD */ = {
 			isa = PBXGroup;
 			children = (
-				H5H5H5H500000001ASKNROT0 /* HUDAskNextRotator.swift */,
-				H2H2H2H200000001CMPLARC0 /* HUDCompletenessArc.swift */,
 				H6H6H6H600000001MODETGL0 /* HUDModeToggle.swift */,
 				H4H4H4H400000001SAFEOVR0 /* HUDSafetyOverlay.swift */,
 				H3H3H3H300000001STATDOT0 /* HUDStatusDots.swift */,
@@ -269,6 +265,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D42F0A000100000003 /* AudioManager.swift */,
+				L1L1L1L100000001LOCSTT0 /* LocalSpeechRecognizer.swift */,
 				A1B2C3D42F0A000100000001 /* GeminiConfig.swift */,
 				A1B2C3D42F0A000100000002 /* GeminiLiveService.swift */,
 				A1B2C3D42F0A000100000004 /* GeminiSessionViewModel.swift */,
@@ -428,12 +425,11 @@
 				F5F5F5F500000002ENCSMVW0 /* EncounterSummaryView.swift in Sources */,
 				G1G1G1G100000002ONBOARD0 /* OnboardingView.swift in Sources */,
 				G2G2G2G200000002REPLAY00 /* ReplaySessionView.swift in Sources */,
-				H2H2H2H200000002CMPLARC0 /* HUDCompletenessArc.swift in Sources */,
 				H3H3H3H300000002STATDOT0 /* HUDStatusDots.swift in Sources */,
 				H4H4H4H400000002SAFEOVR0 /* HUDSafetyOverlay.swift in Sources */,
-				H5H5H5H500000002ASKNROT0 /* HUDAskNextRotator.swift in Sources */,
 				H6H6H6H600000002MODETGL0 /* HUDModeToggle.swift in Sources */,
 				H7H7H7H700000002HUDVWPT0 /* HUDViewport.swift in Sources */,
+				L1L1L1L100000002LOCSTT0 /* LocalSpeechRecognizer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

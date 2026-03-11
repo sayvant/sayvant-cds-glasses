@@ -62,13 +62,18 @@ private struct CDSSessionContent: View {
 
       if isActive {
         if isHUDMode {
-          HUDViewport(bridge: bridge, geminiVM: geminiVM)
+          HUDViewport(bridge: bridge, geminiVM: geminiVM, onEndSession: endSession)
         } else {
           activeSessionView
         }
       } else if isManualAnalyzing || comprehensive != nil {
         if isHUDMode {
-          HUDViewport(bridge: bridge, geminiVM: geminiVM)
+          HUDViewport(bridge: bridge, geminiVM: geminiVM, onEndSession: {
+            bridge.resetSession()
+            manualText = ""
+            isManualAnalyzing = false
+            isDemoMode = false
+          })
         } else {
           manualResultsView
         }
