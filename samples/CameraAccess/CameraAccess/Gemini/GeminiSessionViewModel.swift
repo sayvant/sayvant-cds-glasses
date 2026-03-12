@@ -76,8 +76,9 @@ class GeminiSessionViewModel: ObservableObject {
     }
 
     // Start local on-device speech recognition — near-instant transcription
-    localSTT.requestAuthorization()
-    localSTT.startRecognizing(
+    // Uses combined auth+start to avoid race condition where startRecognizing
+    // runs before authorization callback fires.
+    localSTT.requestAuthorizationAndStart(
       onPartial: { [weak self] text in
         guard let self else { return }
         self.userTranscript = text

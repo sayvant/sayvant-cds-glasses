@@ -19,13 +19,22 @@ class LocalSpeechRecognizer: ObservableObject {
     /// Set whenever recognitionRequest is created/cleared.
     nonisolated(unsafe) private var _requestRef: SFSpeechAudioBufferRecognitionRequest?
 
-    /// Request speech recognition permission.
-    func requestAuthorization() {
+    /// Request speech recognition permission and start recognizing once authorized.
+    func requestAuthorizationAndStart(
+        onPartial: @escaping (String) -> Void,
+        onFinal: @escaping (String) -> Void
+    ) {
+        NSLog("[LocalSTT] Requesting authorization...")
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             Task { @MainActor in
-                self?.isAuthorized = (status == .authorized)
-                if status != .authorized {
-                    NSLog("[LocalSTT] Authorization denied: %d", status.rawValue)
+                guard let self else { return }
+                self.isAuthorized = (status == .authorized)
+                NSLog("[LocalSTT] Authorization status: %d (authorized=%@)",
+                      status.rawValue, status == .authorized ? "YES" : "NO")
+                if status == .authorized {
+                    self.startRecognizing(onPartial: onPartial, onFinal: onFinal)
+                } else {
+                    NSLog("[LocalSTT] NOT AUTHORIZED — speech recognition will not work")
                 }
             }
         }
@@ -37,8 +46,13 @@ class LocalSpeechRecognizer: ObservableObject {
         onPartial: @escaping (String) -> Void,
         onFinal: @escaping (String) -> Void
     ) {
+        NSLog("[LocalSTT] startRecognizing called. recognizer=%@, available=%@, onDevice=%@",
+              recognizer != nil ? "YES" : "NIL",
+              recognizer?.isAvailable == true ? "YES" : "NO",
+              recognizer?.supportsOnDeviceRecognition == true ? "YES" : "NO")
+
         guard recognizer?.isAvailable == true else {
-            NSLog("[LocalSTT] Recognizer not available")
+            NSLog("[LocalSTT] *** Recognizer not available — NO TRANSCRIPTION ***")
             return
         }
 
@@ -73,16 +87,16 @@ class LocalSpeechRecognizer: ObservableObject {
                     self.currentUtterance = text
 
                     if result.isFinal {
-                        // Extract only the new portion since last final
                         let newText = self.extractNewText(from: text)
+                        NSLog("[LocalSTT] FINAL: \"%@\"", newText)
                         if !newText.isEmpty {
                             onFinal(newText)
                         }
                         self.lastFinalText = text
                         self.currentUtterance = ""
                     } else {
-                        // Partial — show what's new since last finalized
                         let newText = self.extractNewText(from: text)
+                        NSLog("[LocalSTT] partial: \"%@\"", newText)
                         if !newText.isEmpty {
                             onPartial(newText)
                         }
