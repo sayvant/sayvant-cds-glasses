@@ -227,8 +227,9 @@ class GeminiSessionViewModel: ObservableObject {
         for call in toolCall.functionCalls {
           self.toolCallRouter?.handleToolCall(call) { [weak self] response in
             guard let self else { return }
-            self.audioGateOpen = true
-            NSLog("[AudioGate] Opened — tool response sent, ready for whisper audio")
+            // Do NOT open audio gate on tool responses — Gemini should stay silent.
+            // Gate only opens via requestSummary() ("what did I miss").
+            NSLog("[ToolResponse] Sending tool result (audio gate stays closed)")
             self.geminiService.sendToolResponse(response)
           }
         }

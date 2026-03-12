@@ -80,7 +80,8 @@ struct HUDViewport: View {
     /// (not just returning the base-rate intercept with zero features).
     private var hasMeaningfulPrediction: Bool {
         guard let pred = prediction else { return false }
-        return !pred.feature_contributions.isEmpty
+        // Must have at least one detected feature AND probability above base rate (7.4%)
+        return !pred.feature_contributions.isEmpty && pred.prob > 0.10
     }
 
     @ViewBuilder

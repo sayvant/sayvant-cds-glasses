@@ -239,9 +239,8 @@ class PABackendBridge: ObservableObject {
   // MARK: - Comprehensive Analysis
 
   /// Shared core: call /comprehensive_analysis, update all published state.
-  /// When `dedup` is true, sends previouslyAsked/Flagged to exclude already-surfaced items.
-  /// Auto-analysis passes false so the HUD always shows current top questions.
-  private func callComprehensiveAnalysis(text: String, dedup: Bool = false) async -> ComprehensiveResponse? {
+  /// Always sends previouslyAsked/Flagged so the backend can exclude already-surfaced items.
+  private func callComprehensiveAnalysis(text: String) async -> ComprehensiveResponse? {
     guard !text.isEmpty else { return nil }
     guard let url = URL(string: "\(GeminiConfig.paBackendURL)/comprehensive_analysis") else {
       analysisError = "Invalid PA backend URL"
@@ -258,8 +257,8 @@ class PABackendBridge: ObservableObject {
 
     let body: [String: Any] = [
       "text": text,
-      "previously_asked": dedup ? previouslyAsked : [],
-      "previously_flagged": dedup ? previouslyFlagged : [],
+      "previously_asked": previouslyAsked,
+      "previously_flagged": previouslyFlagged,
     ]
 
     do {
@@ -349,7 +348,7 @@ class PABackendBridge: ObservableObject {
     // Accumulate transcript
     appendTranscript(transcript)
 
-    guard let comprehensive = await callComprehensiveAnalysis(text: fullTranscript, dedup: true) else {
+    guard let comprehensive = await callComprehensiveAnalysis(text: fullTranscript) else {
       lastToolCallStatus = .failed(toolName, "Analysis failed")
       isPredicting = false
       return .failure("PA backend analysis failed")
