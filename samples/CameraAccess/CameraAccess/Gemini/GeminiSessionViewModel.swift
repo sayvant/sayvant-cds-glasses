@@ -301,10 +301,17 @@ class GeminiSessionViewModel: ObservableObject {
   /// Called every 2 seconds so auto-analysis has data without waiting for onFinal.
   private func flushPartialToBackend() {
     let current = userTranscript
-    guard !current.isEmpty, current.count > lastFlushedPartial.count else { return }
+    guard !current.isEmpty else { return }
+
+    // If STT recognition restarted, the partial text resets to a shorter/different
+    // string. Detect this and reset tracking so new speech gets flushed.
+    if !lastFlushedPartial.isEmpty && !current.hasPrefix(lastFlushedPartial) {
+      lastFlushedPartial = ""
+    }
+    guard current.count > lastFlushedPartial.count else { return }
 
     let delta: String
-    if current.hasPrefix(lastFlushedPartial) {
+    if !lastFlushedPartial.isEmpty, current.hasPrefix(lastFlushedPartial) {
       delta = String(current.dropFirst(lastFlushedPartial.count))
         .trimmingCharacters(in: .whitespaces)
     } else {
