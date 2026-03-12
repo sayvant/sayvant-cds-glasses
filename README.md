@@ -1,6 +1,6 @@
 # Sayvant CDS Glasses
 
-Real-time clinical decision support whispered to physicians through Meta Ray-Ban glasses during patient encounters. Hands-free, eyes-free, zero workflow disruption.
+Real-time clinical decision support displayed on a heads-up display for physicians wearing smart glasses during patient encounters. Hands-free, eyes-free, zero workflow disruption.
 
 Forked from [VisionClaw](https://github.com/sseanliu/VisionClaw). Video stripped. Audio pipeline preserved. OpenClaw replaced with Sayvant PA backend.
 
@@ -10,20 +10,32 @@ Forked from [VisionClaw](https://github.com/sseanliu/VisionClaw). Video stripped
 Ray-Ban Glasses (mic)
     | Bluetooth audio
 iPhone (in pocket)
-    | AudioManager: 16kHz PCM -> base64
-Gemini Live API (WebSocket)
-    | STT + clinical content detection
-    | Calls analyze_encounter tool
-iPhone: PABackendBridge
-    | HTTP POST /cds_whisper
-PA Backend (Railway)
-    | preprocess() -> guidance_engine -> dedup filter
-    | Returns: ask_next + red_flags + completeness_score
-Gemini (generates whisper audio)
-    | 24kHz PCM -> Bluetooth
-Ray-Ban Glasses (speaker)
-    -> Physician hears: "Ask about radiation to arm or jaw"
+    | AudioManager: dual output
+    |   1. Raw Float32 buffer → LocalSpeechRecognizer (on-device STT, ~100ms)
+    |   2. Resampled 16kHz Int16 → Gemini Live WebSocket (clinical context)
+    |
+    ├── Local STT partials → flush every 2s → PABackendBridge.fullTranscript
+    ├── Auto-analysis loop (every 3s) → POST /comprehensive_analysis
+    └── Gemini tool calls (analyze_encounter) → POST /comprehensive_analysis
+                              ↓
+              PA Backend (Railway) — same model as web app
+              360-chart LogReg + Bayesian differential + safety engine
+                              ↓
+              HUD renders: risk score, ask-next questions, completeness
+              Physician hears whisper ONLY on "What did I miss?" tap
 ```
+
+## Two display modes
+
+**Card View** (default): Full scrollable cards — risk score, differential diagnosis, workup, feature attribution, troponin/disposition predictions, timeline, transcript.
+
+**Glasses Mode** (HUD): Compact heads-up display optimized for ambient glanceable use:
+- Risk strip (percentage + band + disposition)
+- Ask-next hero (rotating questions with example phrasing)
+- Live transcript indicator (waveform + last few words)
+- Completeness bar
+- End session button + status dots
+- No risk shown until features actually detected (no misleading base rate)
 
 ## Setup
 
@@ -37,48 +49,42 @@ Ray-Ban Glasses (speaker)
 
 | File | What it does |
 |------|-------------|
-| `Gemini/GeminiLiveService.swift` | WebSocket to Gemini Live API (kept from VisionClaw) |
-| `Gemini/AudioManager.swift` | Mic capture + speaker playback with Bluetooth routing |
-| `Gemini/GeminiConfig.swift` | Clinical system prompt + PA backend config |
-| `Gemini/GeminiSessionViewModel.swift` | Session lifecycle, tool routing |
-| `OpenClaw/PABackendBridge.swift` | HTTP client for /cds_whisper endpoint |
-| `OpenClaw/ToolCallModels.swift` | analyze_encounter tool declaration |
+| `Gemini/LocalSpeechRecognizer.swift` | On-device Apple STT (~100ms latency, primary transcription) |
+| `Gemini/AudioManager.swift` | Mic capture + Bluetooth speaker playback, dual buffer output |
+| `Gemini/GeminiSessionViewModel.swift` | Session lifecycle, partial flush, auto-analysis, audio gate |
+| `Gemini/GeminiConfig.swift` | System prompt (silence-enforced), model config, URLs |
+| `Gemini/GeminiLiveService.swift` | WebSocket to Gemini Live API |
+| `OpenClaw/PABackendBridge.swift` | HTTP client for /comprehensive_analysis, owns all clinical state |
 | `OpenClaw/ToolCallRouter.swift` | Routes Gemini tool calls to PA bridge |
-| `Views/CDSSessionView.swift` | Session UI: start/stop, red flags, transcript |
+| `Views/CDSSessionView.swift` | Master view: pre-session, active session, card stack |
+| `Views/HUD/HUDViewport.swift` | Glasses-mode HUD with ask-next hero + live transcript |
 
-## What was stripped from VisionClaw
+## Architecture highlights
 
-- All video/camera code (IPhoneCameraManager, WebRTC, photo capture)
-- OpenClaw bridge and execute tool
-- Meta DAT SDK wearables registration flow
-- Android project
-- WebRTC signaling
+**Local STT first, Gemini second**: Audio capture and on-device speech recognition start immediately. Gemini connects in the background. If Gemini fails, the session continues with local STT only.
 
-## Gemini behavior
+**Partial transcript flush**: SFSpeechRecognizer's `onFinal` only fires after speech pauses. A 2-second flush timer periodically commits partial text to the backend so auto-analysis doesn't wait for silence.
 
-The system prompt makes Gemini a silent clinical advisor:
-- Listens to physician-patient conversation via glasses mic
-- Calls `analyze_encounter` after hearing clinical content
-- Whispers guidance through glasses speaker (under 15 words)
-- Red flags interrupt immediately. Questions wait for pauses.
-- Stops suggesting when completeness > 80%
+**Audio gate**: Gemini is instructed to stay completely silent. The audio gate is closed by default. Only opens when the physician taps "What did I miss?" for a whispered summary.
+
+**Feature-gated display**: Risk score and differential hidden until the model detects actual clinical features (not just the 7.4% base rate intercept with zero features).
 
 ## HIPAA
 
-**Prototype only.** Patient audio goes to Google (Gemini). Text goes to Railway. Neither has a BAA.
+**Prototype only.** Patient audio goes to Google (Gemini) and Apple (SFSpeechRecognizer server fallback). Text goes to Railway. None have a BAA.
 
 Use with simulated patients only.
 
-Production path: on-device STT (`SFSpeechRecognizer`, offline iOS 17+) + text-only to HIPAA-compliant LLM (Claude API with Anthropic BAA). Audio never leaves device.
+Production path: on-device STT only (no server fallback) + text-only to HIPAA-compliant API (Claude with Anthropic BAA). Audio never leaves device.
 
 ## Backend
 
 The PA backend lives in a separate repo: [sayvant/predictive-analytics](https://github.com/sayvant/predictive-analytics)
 
-The only coupling is the `/cds_whisper` endpoint:
+Primary endpoint: `/comprehensive_analysis` — returns prediction, differential, guidance, workup, uncertainty in one call.
 
 ```bash
-curl -X POST https://predictive-analytics.up.railway.app/cds_whisper \
+curl -X POST https://predictive-analytics.up.railway.app/comprehensive_analysis \
   -H "X-CDS-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{"text": "chest pain for 2 hours radiating to left arm"}'
