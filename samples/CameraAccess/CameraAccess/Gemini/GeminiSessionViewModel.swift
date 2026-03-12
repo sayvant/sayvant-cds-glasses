@@ -21,7 +21,9 @@ class GeminiSessionViewModel: ObservableObject {
   let localSTT = LocalSpeechRecognizer()
   private var stateObservation: Task<Void, Never>?
   private var autoAnalysisTask: Task<Void, Never>?
+  private var partialFlushTask: Task<Void, Never>?
   private var lastAutoAnalyzedLength = 0
+  private var lastFlushedPartial: String = ""
 
   /// Audio gate: only play Gemini audio that arrives after we send a tool response.
   /// Prevents Gemini's conversational/acknowledgment audio from playing.
@@ -78,6 +80,7 @@ class GeminiSessionViewModel: ObservableObject {
     // Start local on-device speech recognition — near-instant transcription
     // Uses combined auth+start to avoid race condition where startRecognizing
     // runs before authorization callback fires.
+    lastFlushedPartial = ""
     localSTT.requestAuthorizationAndStart(
       onPartial: { [weak self] text in
         guard let self else { return }
@@ -87,26 +90,50 @@ class GeminiSessionViewModel: ObservableObject {
         guard let self else { return }
         self.userTranscript = ""
         if !text.isEmpty {
-          if let lastIdx = self.transcriptEntries.indices.last,
-             self.transcriptEntries[lastIdx].speaker == .patient,
-             Date().timeIntervalSince(self.transcriptEntries[lastIdx].timestamp) < 3.0 {
-            let existing = self.transcriptEntries[lastIdx]
-            self.transcriptEntries[lastIdx] = TranscriptEntry(
-              merging: existing.text + " " + text,
-              from: existing
-            )
+          // Only commit the delta beyond what periodic flushes already sent
+          let remaining: String
+          if !self.lastFlushedPartial.isEmpty, text.hasPrefix(self.lastFlushedPartial) {
+            remaining = String(text.dropFirst(self.lastFlushedPartial.count))
+              .trimmingCharacters(in: .whitespaces)
+          } else if self.lastFlushedPartial.isEmpty {
+            remaining = text
           } else {
-            self.transcriptEntries.append(TranscriptEntry(text: text, speaker: .patient))
+            remaining = "" // Partials already covered this text
           }
-          self.paBackendBridge.appendTranscript(text)
+          self.lastFlushedPartial = "" // Reset for next utterance
+
+          if !remaining.isEmpty {
+            self.paBackendBridge.appendTranscript(remaining)
+            if let lastIdx = self.transcriptEntries.indices.last,
+               self.transcriptEntries[lastIdx].speaker == .patient,
+               Date().timeIntervalSince(self.transcriptEntries[lastIdx].timestamp) < 5.0 {
+              let existing = self.transcriptEntries[lastIdx]
+              self.transcriptEntries[lastIdx] = TranscriptEntry(
+                merging: existing.text + " " + remaining,
+                from: existing
+              )
+            } else {
+              self.transcriptEntries.append(TranscriptEntry(text: remaining, speaker: .patient))
+            }
+          }
         }
       }
     )
 
-    // Start auto-analysis loop
+    // Flush partial STT text to backend every 2 seconds so auto-analysis
+    // doesn't wait for onFinal (which only fires after speech pauses).
+    partialFlushTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        guard !Task.isCancelled, let self else { break }
+        self.flushPartialToBackend()
+      }
+    }
+
+    // Start auto-analysis loop (reduced delays: 2s initial, 3s cycle)
     lastAutoAnalyzedLength = 0
     autoAnalysisTask = Task { [weak self] in
-      try? await Task.sleep(nanoseconds: 4_000_000_000)
+      try? await Task.sleep(nanoseconds: 2_000_000_000)
       while !Task.isCancelled {
         guard let self else { break }
         let currentLength = self.paBackendBridge.fullTranscript.count
@@ -118,7 +145,7 @@ class GeminiSessionViewModel: ObservableObject {
             self.lastAutoAnalyzedLength = currentLength
           }
         }
-        try? await Task.sleep(nanoseconds: 5_000_000_000)
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
       }
     }
 
@@ -268,9 +295,47 @@ class GeminiSessionViewModel: ObservableObject {
     }
   }
 
+  // MARK: - Partial Flush
+
+  /// Commit accumulated partial STT text to the PA backend transcript.
+  /// Called every 2 seconds so auto-analysis has data without waiting for onFinal.
+  private func flushPartialToBackend() {
+    let current = userTranscript
+    guard !current.isEmpty, current.count > lastFlushedPartial.count else { return }
+
+    let delta: String
+    if current.hasPrefix(lastFlushedPartial) {
+      delta = String(current.dropFirst(lastFlushedPartial.count))
+        .trimmingCharacters(in: .whitespaces)
+    } else {
+      delta = current
+    }
+    guard !delta.isEmpty else { return }
+
+    NSLog("[PartialFlush] +%d chars → backend (total partial: %d)", delta.count, current.count)
+    paBackendBridge.appendTranscript(delta)
+
+    // Update transcript entries for live display
+    if let lastIdx = transcriptEntries.indices.last,
+       transcriptEntries[lastIdx].speaker == .patient,
+       Date().timeIntervalSince(transcriptEntries[lastIdx].timestamp) < 5.0 {
+      let existing = transcriptEntries[lastIdx]
+      transcriptEntries[lastIdx] = TranscriptEntry(
+        merging: existing.text + " " + delta,
+        from: existing
+      )
+    } else {
+      transcriptEntries.append(TranscriptEntry(text: delta, speaker: .patient))
+    }
+
+    lastFlushedPartial = current
+  }
+
   func stopSession() {
     localSTT.stopRecognizing()
     paBackendBridge.stopAutoSave()
+    partialFlushTask?.cancel()
+    partialFlushTask = nil
     autoAnalysisTask?.cancel()
     autoAnalysisTask = nil
     toolCallRouter?.cancelAll()
