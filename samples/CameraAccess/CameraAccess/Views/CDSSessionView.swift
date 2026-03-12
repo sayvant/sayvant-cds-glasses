@@ -429,8 +429,10 @@ private struct CDSSessionContent: View {
           listeningIndicator
         }
 
-        // Risk score hero card
-        if let pred = prediction {
+        // Risk score hero card (hidden until features detected above base rate)
+        if let pred = prediction,
+           !pred.feature_contributions.isEmpty,
+           pred.prob > 0.10 {
           RiskScoreCard(prediction: pred, uncertainty: comprehensive?.uncertainty)
         } else if bridge.isPredicting {
           predictingPlaceholder

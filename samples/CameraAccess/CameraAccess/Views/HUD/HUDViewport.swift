@@ -213,11 +213,49 @@ struct HUDViewport: View {
         }
     }
 
+    // MARK: - Live Transcript Indicator
+
+    @ViewBuilder
+    private func liveTranscriptIndicator(scale: CGFloat) -> some View {
+        let liveText = geminiVM.userTranscript
+        let lastWords: String = {
+            let words = liveText.split(separator: " ")
+            let tail = words.suffix(6).joined(separator: " ")
+            return tail.isEmpty ? "" : tail
+        }()
+
+        HStack(spacing: 8 * scale) {
+            // Waveform icon — animates when speech is active
+            Image(systemName: liveText.isEmpty ? "waveform" : "waveform")
+                .font(.system(size: 14 * scale))
+                .foregroundColor(liveText.isEmpty ? .white.opacity(0.1) : .cyan.opacity(0.6))
+                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: !liveText.isEmpty)
+
+            if !lastWords.isEmpty {
+                Text(lastWords)
+                    .font(.system(size: 11 * scale, weight: .regular, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            } else {
+                Text("waiting for speech...")
+                    .font(.system(size: 10 * scale, weight: .regular, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.12))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 24 * scale)
+        .frame(height: 20 * scale)
+    }
+
     // MARK: - Bottom Section (completeness + end session + status)
 
     @ViewBuilder
     private func bottomSection(scale: CGFloat) -> some View {
-        VStack(spacing: 12 * scale) {
+        VStack(spacing: 8 * scale) {
+
+            // Live transcript indicator (waveform + last words)
+            liveTranscriptIndicator(scale: scale)
 
             // Completeness bar
             if bridge.completenessScore > 0 {
