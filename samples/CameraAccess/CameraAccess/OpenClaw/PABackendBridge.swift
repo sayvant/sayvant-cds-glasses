@@ -239,8 +239,9 @@ class PABackendBridge: ObservableObject {
   // MARK: - Comprehensive Analysis
 
   /// Shared core: call /comprehensive_analysis, update all published state.
-  /// Returns the decoded response on success, nil on failure.
-  private func callComprehensiveAnalysis(text: String) async -> ComprehensiveResponse? {
+  /// When `dedup` is true, sends previouslyAsked/Flagged to exclude already-surfaced items.
+  /// Auto-analysis passes false so the HUD always shows current top questions.
+  private func callComprehensiveAnalysis(text: String, dedup: Bool = false) async -> ComprehensiveResponse? {
     guard !text.isEmpty else { return nil }
     guard let url = URL(string: "\(GeminiConfig.paBackendURL)/comprehensive_analysis") else {
       analysisError = "Invalid PA backend URL"
@@ -257,8 +258,8 @@ class PABackendBridge: ObservableObject {
 
     let body: [String: Any] = [
       "text": text,
-      "previously_asked": previouslyAsked,
-      "previously_flagged": previouslyFlagged,
+      "previously_asked": dedup ? previouslyAsked : [],
+      "previously_flagged": dedup ? previouslyFlagged : [],
     ]
 
     do {
@@ -324,18 +325,6 @@ class PABackendBridge: ObservableObject {
       ))
     }
 
-    // Update dedup state for guidance
-    for q in comprehensive.guidance.ask_next {
-      if !previouslyAsked.contains(q.id) {
-        previouslyAsked.append(q.id)
-      }
-    }
-    for rf in comprehensive.guidance.red_flags {
-      if !previouslyFlagged.contains(rf.id) {
-        previouslyFlagged.append(rf.id)
-      }
-    }
-
     // Update published guidance state for UI
     completenessScore = comprehensive.guidance.completeness.overall_score
     askNextQuestions = comprehensive.guidance.ask_next
@@ -360,10 +349,22 @@ class PABackendBridge: ObservableObject {
     // Accumulate transcript
     appendTranscript(transcript)
 
-    guard let comprehensive = await callComprehensiveAnalysis(text: fullTranscript) else {
+    guard let comprehensive = await callComprehensiveAnalysis(text: fullTranscript, dedup: true) else {
       lastToolCallStatus = .failed(toolName, "Analysis failed")
       isPredicting = false
       return .failure("PA backend analysis failed")
+    }
+
+    // Track dedup for Gemini tool calls only — prevents repeated whisper suggestions
+    for q in comprehensive.guidance.ask_next {
+      if !previouslyAsked.contains(q.id) {
+        previouslyAsked.append(q.id)
+      }
+    }
+    for rf in comprehensive.guidance.red_flags {
+      if !previouslyFlagged.contains(rf.id) {
+        previouslyFlagged.append(rf.id)
+      }
     }
 
     let resultText = buildGeminiResponse(comprehensive)

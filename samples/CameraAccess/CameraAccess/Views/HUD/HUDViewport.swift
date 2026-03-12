@@ -76,9 +76,16 @@ struct HUDViewport: View {
 
     // MARK: - Risk Strip (compact horizontal bar)
 
+    /// True when the model has detected at least one clinical feature
+    /// (not just returning the base-rate intercept with zero features).
+    private var hasMeaningfulPrediction: Bool {
+        guard let pred = prediction else { return false }
+        return !pred.feature_contributions.isEmpty
+    }
+
     @ViewBuilder
     private func riskStrip(scale: CGFloat) -> some View {
-        if let pred = prediction {
+        if let pred = prediction, hasMeaningfulPrediction {
             let pct = Int(pred.prob * 100)
             let color = bandColor(pred.band)
 
@@ -169,8 +176,8 @@ struct HUDViewport: View {
                 )
             }
             .padding(.horizontal, 24 * scale)
-        } else if prediction == nil {
-            // Listening state
+        } else if !hasMeaningfulPrediction {
+            // No features detected yet — still listening
             VStack(spacing: 12 * scale) {
                 Image(systemName: "waveform")
                     .font(.system(size: 32 * scale))
@@ -180,8 +187,8 @@ struct HUDViewport: View {
                     .font(.system(size: 14 * scale, weight: .medium, design: .monospaced))
                     .foregroundColor(.white.opacity(0.2))
             }
-        } else {
-            // Prediction exists but no questions (high completeness)
+        } else if bridge.completenessScore > 80 {
+            // Genuinely complete history
             VStack(spacing: 10 * scale) {
                 Image(systemName: "checkmark.circle")
                     .font(.system(size: 36 * scale))
@@ -189,6 +196,18 @@ struct HUDViewport: View {
                 Text("History complete")
                     .font(.system(size: 14 * scale, weight: .medium, design: .monospaced))
                     .foregroundColor(.green.opacity(0.5))
+            }
+        } else {
+            // Prediction exists, low completeness, but no questions returned
+            // (shouldn't normally happen — fallback)
+            VStack(spacing: 12 * scale) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 32 * scale))
+                    .foregroundColor(.white.opacity(0.15))
+                    .symbolEffect(.variableColor.iterative, options: .repeating)
+                Text("Analyzing...")
+                    .font(.system(size: 14 * scale, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.2))
             }
         }
     }
