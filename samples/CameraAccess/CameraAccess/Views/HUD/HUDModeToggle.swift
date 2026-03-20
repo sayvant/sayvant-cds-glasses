@@ -12,7 +12,7 @@ struct HUDModeToggle: View {
             Image(systemName: isHUDMode ? "rectangle.stack" : "eyeglasses")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(Color.white.opacity(0.15))
                 .clipShape(Circle())
         }

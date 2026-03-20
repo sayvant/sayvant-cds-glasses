@@ -201,6 +201,11 @@ struct CompletenessCard: View {
                           .font(.system(size: 11, design: .monospaced))
                           .foregroundColor(Color(white: 0.4))
                       }
+                      Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color(white: 0.4))
+                        .rotationEffect(.degrees(expandedCategory == category ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.2), value: expandedCategory)
                     }
                   }
                   .buttonStyle(.plain)

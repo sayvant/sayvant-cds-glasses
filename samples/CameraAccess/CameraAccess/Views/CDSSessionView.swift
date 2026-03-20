@@ -134,17 +134,39 @@ private struct CDSSessionContent: View {
 
       Spacer()
 
-      // Demo scenario buttons
-      VStack(spacing: 6) {
-        demoButton("Demo: Classic ACS (High Risk)", scenario: .classicACS)
-        demoButton("Demo: Low Risk MSK", scenario: .lowRisk)
-        demoButton("Demo: Safety Override", scenario: .highRiskSafety)
+      // Demo scenario buttons (collapsed)
+      DisclosureGroup {
+        VStack(spacing: 8) {
+          demoButton("Classic ACS (High Risk)", scenario: .classicACS)
+          demoButton("Low Risk MSK", scenario: .lowRisk)
+          demoButton("Safety Override", scenario: .highRiskSafety)
+        }
+      } label: {
+        HStack {
+          Image(systemName: "play.circle.fill")
+          Text("Demo Mode")
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.cyan)
       }
+      .tint(.cyan)
       .padding(.horizontal, 24)
       .padding(.bottom, 8)
 
-      // Manual text input
-      manualTextInput
+      // Manual text input (collapsed)
+      DisclosureGroup {
+        manualTextInputContent
+      } label: {
+        HStack {
+          Image(systemName: "text.cursor")
+          Text("Manual Input")
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.cyan)
+      }
+      .tint(.cyan)
+      .padding(.horizontal, 24)
+      .padding(.bottom, 8)
 
       sessionButton
 
@@ -202,21 +224,8 @@ private struct CDSSessionContent: View {
 
   // MARK: - Manual Text Input
 
-  private var manualTextInput: some View {
+  private var manualTextInputContent: some View {
     VStack(spacing: 8) {
-      HStack {
-        Rectangle()
-          .fill(Color(white: 0.25))
-          .frame(height: 1)
-        Text("or")
-          .font(.system(size: 12))
-          .foregroundColor(Color(white: 0.35))
-        Rectangle()
-          .fill(Color(white: 0.25))
-          .frame(height: 1)
-      }
-      .padding(.horizontal, 40)
-
       TextEditor(text: $manualText)
         .font(.system(size: 14))
         .foregroundColor(.white)
@@ -274,7 +283,6 @@ private struct CDSSessionContent: View {
           .padding(.horizontal, 24)
       }
 
-      Spacer().frame(height: 12)
     }
   }
 
@@ -316,10 +324,10 @@ private struct CDSSessionContent: View {
           Text("using sample data")
             .font(.system(size: 11))
         }
-        .foregroundColor(.cyan)
+        .foregroundColor(.yellow)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .background(Color.cyan.opacity(0.1))
+        .background(Color.yellow.opacity(0.15))
       }
 
       statusBar
@@ -489,6 +497,8 @@ private struct CDSSessionContent: View {
       .padding(.horizontal, 16)
       .padding(.vertical, 12)
     }
+    .animation(.easeOut(duration: 0.3), value: bridge.predictionResult != nil)
+    .animation(.easeOut(duration: 0.3), value: bridge.comprehensiveResult != nil)
   }
 
   // MARK: - Shared Components
@@ -513,8 +523,8 @@ private struct CDSSessionContent: View {
         showSettings = true
       } label: {
         Image(systemName: "gearshape")
-          .foregroundColor(.white.opacity(0.7))
-          .font(.system(size: 18))
+          .foregroundColor(.white)
+          .font(.system(size: 20))
       }
     }
     .padding(.horizontal, 16)
@@ -525,8 +535,10 @@ private struct CDSSessionContent: View {
   private var sessionButton: some View {
     Button {
       if isActive {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
         endSession()
       } else {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Task { await geminiVM.startSession() }
       }
     } label: {

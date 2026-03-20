@@ -19,10 +19,8 @@ struct SettingsView: View {
             Text("API Key")
               .font(.caption)
               .foregroundColor(.secondary)
-            TextField("Enter Gemini API key", text: $geminiAPIKey)
-              .autocapitalization(.none)
+            SecureField("Enter Gemini API key", text: $geminiAPIKey)
               .disableAutocorrection(true)
-              .font(.system(.body, design: .monospaced))
           }
         }
 
@@ -48,8 +46,7 @@ struct SettingsView: View {
             Text("CDS API Key")
               .font(.caption)
               .foregroundColor(.secondary)
-            TextField("CDS API key", text: $cdsAPIKey)
-              .autocapitalization(.none)
+            SecureField("CDS API key", text: $cdsAPIKey)
               .disableAutocorrection(true)
               .font(.system(.body, design: .monospaced))
           }

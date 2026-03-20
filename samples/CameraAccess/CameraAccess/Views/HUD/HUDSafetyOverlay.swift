@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HUDSafetyOverlay: View {
     let safetyApplied: Bool
@@ -50,29 +51,19 @@ struct HUDSafetyOverlay: View {
             .transition(.move(edge: .top).combined(with: .opacity))
             .onAppear {
                 if hasRedFlag && !hasSafety {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
                     withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                         redFlagPulse = true
-                    }
-                    // Auto-fade after 10s
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                        withAnimation(.easeOut(duration: 0.5)) {
-                            redFlagVisible = false
-                        }
                     }
                 }
             }
             .onChange(of: activeRedFlag) { _ in
                 // Flash on new red flag
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
                 flashWhite = true
                 redFlagVisible = true
                 withAnimation(.easeOut(duration: 0.3)) {
                     flashWhite = false
-                }
-                // Reset auto-fade
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        redFlagVisible = false
-                    }
                 }
             }
         }

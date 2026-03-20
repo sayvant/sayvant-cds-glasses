@@ -267,19 +267,20 @@ struct HUDViewport: View {
                 // End encounter button
                 if let endAction = onEndSession {
                     Button {
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
                         endAction()
                     } label: {
                         HStack(spacing: 6 * scale) {
                             Image(systemName: "stop.fill")
-                                .font(.system(size: 10 * scale))
+                                .font(.system(size: 12 * scale))
                             Text("END")
-                                .font(.system(size: 11 * scale, weight: .bold, design: .monospaced))
+                                .font(.system(size: 13 * scale, weight: .bold, design: .monospaced))
                                 .tracking(1)
                         }
-                        .foregroundColor(.white.opacity(0.8))
-                        .padding(.horizontal, 14 * scale)
-                        .padding(.vertical, 8 * scale)
-                        .background(Color.red.opacity(0.3))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16 * scale)
+                        .padding(.vertical, 10 * scale)
+                        .background(Color.red.opacity(0.5))
                         .cornerRadius(6 * scale)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6 * scale)
@@ -314,7 +315,7 @@ struct HUDViewport: View {
         VStack(spacing: 4 * scale) {
             HStack {
                 Text("COMPLETENESS")
-                    .font(.system(size: 9 * scale, weight: .bold, design: .monospaced))
+                    .font(.system(size: max(9, 9 * scale), weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.3))
                     .tracking(1)
                 Spacer()

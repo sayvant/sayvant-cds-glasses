@@ -9,17 +9,35 @@ struct HUDStatusDots: View {
     private var dotSize: CGFloat { 6 * scale }
     private var spacing: CGFloat { 8 * scale }
 
+    private var labelFont: Font { .system(size: 7 * scale, weight: .medium, design: .monospaced) }
+    private var labelColor: Color { .white.opacity(0.4) }
+
     var body: some View {
         HStack(spacing: spacing) {
-            Circle()
-                .fill(geminiDotColor)
-                .frame(width: dotSize, height: dotSize)
-            Circle()
-                .fill(paDotColor)
-                .frame(width: dotSize, height: dotSize)
-            Circle()
-                .fill(audioDotColor)
-                .frame(width: dotSize, height: dotSize)
+            VStack(spacing: 2 * scale) {
+                Circle()
+                    .fill(geminiDotColor)
+                    .frame(width: dotSize, height: dotSize)
+                Text("AI")
+                    .font(labelFont)
+                    .foregroundColor(labelColor)
+            }
+            VStack(spacing: 2 * scale) {
+                Circle()
+                    .fill(paDotColor)
+                    .frame(width: dotSize, height: dotSize)
+                Text("CDS")
+                    .font(labelFont)
+                    .foregroundColor(labelColor)
+            }
+            VStack(spacing: 2 * scale) {
+                Circle()
+                    .fill(audioDotColor)
+                    .frame(width: dotSize, height: dotSize)
+                Text("Mic")
+                    .font(labelFont)
+                    .foregroundColor(labelColor)
+            }
         }
     }
 

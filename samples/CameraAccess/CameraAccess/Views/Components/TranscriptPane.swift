@@ -87,6 +87,7 @@ struct TranscriptPane: View {
             Image(systemName: isPaused ? "play.fill" : "pause.fill")
               .font(.system(size: 9))
               .foregroundColor(isPaused ? .orange : .white.opacity(0.4))
+              .frame(minWidth: 44, minHeight: 44)
           }
           .buttonStyle(.plain)
 
@@ -94,10 +95,12 @@ struct TranscriptPane: View {
             Text("\(entries.count)")
               .font(.system(size: 9, weight: .bold, design: .monospaced))
               .foregroundColor(.white.opacity(0.4))
+              .frame(minWidth: 44, minHeight: 44)
           }
           Image(systemName: "arrow.up.left.and.arrow.down.right")
             .font(.system(size: 8))
             .foregroundColor(.white.opacity(0.3))
+            .frame(minWidth: 44, minHeight: 44)
         }
         .padding(4)
         .background(Color.black.opacity(0.6))
