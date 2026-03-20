@@ -397,7 +397,7 @@ class PABackendBridge: ObservableObject {
 
     // Can't-miss alerts from differential
     for alert in response.differential.cant_miss_alerts {
-      parts.append("CAN'T MISS: \(alert.diagnosis) (\(Int(alert.probabilityPct))%)")
+      parts.append("CAN'T MISS: \(alert.displayLabel) (\(Int(alert.probabilityPct))%)")
     }
 
     // Ask-next suggestions
@@ -446,7 +446,47 @@ class PABackendBridge: ObservableObject {
     }
     resetSession()
     applyComprehensiveResult(response)
-    NSLog("[Demo] Loaded scenario: %@", scenario.rawValue)
+
+    // Add synthetic timeline entries so the sparkline chart renders (requires >= 2 entries).
+    // The single entry from applyComprehensiveResult is replaced with a progressive sequence.
+    let now = Date()
+    let completeness = response.guidance.completeness.overall_score
+    let steps: [(offset: TimeInterval, prob: Double)]
+    switch scenario {
+    case .classicACS:
+      steps = [
+        (-120, 0.074),
+        (-90, 0.35),
+        (-60, 0.65),
+        (-30, 0.85),
+        (0, 0.991)
+      ]
+    case .lowRisk:
+      steps = [
+        (-90, 0.074),
+        (-60, 0.15),
+        (-30, 0.20),
+        (0, 0.26)
+      ]
+    case .highRiskSafety:
+      steps = [
+        (-120, 0.074),
+        (-90, 0.50),
+        (-60, 0.80),
+        (-30, 0.95),
+        (0, 0.999)
+      ]
+    }
+    timelineEntries = steps.map { step in
+      TimelineEntry(
+        timestamp: now.addingTimeInterval(step.offset),
+        acsProb: step.prob,
+        completeness: completeness,
+        newFeatures: []
+      )
+    }
+
+    NSLog("[Demo] Loaded scenario: %@ with %d timeline entries", scenario.rawValue, timelineEntries.count)
   }
 
   // MARK: - Full Summary

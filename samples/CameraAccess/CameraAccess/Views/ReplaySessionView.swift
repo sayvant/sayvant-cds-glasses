@@ -237,7 +237,7 @@ struct ReplaySessionView: View {
     }
 
     if let diffs = comprehensive?.differential.ranked_diagnoses.prefix(5) {
-      text += "Top Dx: \(diffs.map { "\($0.diagnosis) (\(Int($0.probabilityPct))%)" }.joined(separator: ", "))\n"
+      text += "Top Dx: \(diffs.map { "\($0.displayLabel) (\(Int($0.probabilityPct))%)" }.joined(separator: ", "))\n"
     }
 
     if let disp = prediction?.disposition_prediction {

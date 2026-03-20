@@ -28,7 +28,7 @@ struct DifferentialCard: View {
               Circle()
                 .fill(Color.red)
                 .frame(width: 8, height: 8)
-              Text(alert.diagnosis)
+              Text(alert.displayLabel)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
               Spacer()
@@ -65,7 +65,7 @@ struct DifferentialCard: View {
             }
           } label: {
             HStack(spacing: 8) {
-              Text(dx.diagnosis)
+              Text(dx.displayLabel)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white)
               Spacer()

@@ -134,22 +134,11 @@ private struct CDSSessionContent: View {
 
       Spacer()
 
-      // Demo mode button
-      Button {
-        isDemoMode = true
-        bridge.loadDemoData(.classicACS)
-      } label: {
-        HStack(spacing: 8) {
-          Image(systemName: "play.rectangle.fill")
-            .font(.system(size: 16))
-          Text("Try Demo")
-            .font(.system(size: 16, weight: .semibold))
-        }
-        .foregroundColor(.cyan)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color.cyan.opacity(0.12))
-        .cornerRadius(12)
+      // Demo scenario buttons
+      VStack(spacing: 6) {
+        demoButton("Demo: Classic ACS (High Risk)", scenario: .classicACS)
+        demoButton("Demo: Low Risk MSK", scenario: .lowRisk)
+        demoButton("Demo: Safety Override", scenario: .highRiskSafety)
       }
       .padding(.horizontal, 24)
       .padding(.bottom, 8)
@@ -286,6 +275,25 @@ private struct CDSSessionContent: View {
       }
 
       Spacer().frame(height: 12)
+    }
+  }
+
+  private func demoButton(_ title: String, scenario: PABackendBridge.DemoScenario) -> some View {
+    Button {
+      isDemoMode = true
+      bridge.loadDemoData(scenario)
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: "play.fill")
+          .font(.system(size: 12))
+        Text(title)
+          .font(.system(size: 14, weight: .semibold))
+      }
+      .foregroundColor(.cyan)
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 10)
+      .background(Color.cyan.opacity(0.12))
+      .cornerRadius(10)
     }
   }
 
@@ -564,11 +572,11 @@ private struct CDSSessionContent: View {
         transcript: finalTranscript,
         acsRiskPct: prediction?.probabilityPct,
         riskBand: prediction?.band,
-        topDiagnosis: comprehensive?.differential.ranked_diagnoses.first?.diagnosis,
+        topDiagnosis: comprehensive?.differential.ranked_diagnoses.first?.displayLabel,
         disposition: prediction?.disposition_prediction?.recommendation,
         completenessScore: bridge.completenessScore,
         differentialSummary: comprehensive?.differential.ranked_diagnoses.prefix(5).map {
-          DiagnosisSummaryItem(diagnosis: $0.diagnosis, probabilityPct: $0.probabilityPct)
+          DiagnosisSummaryItem(diagnosis: $0.displayLabel, probabilityPct: $0.probabilityPct)
         },
         workupItems: comprehensive?.recommended_workup,
         redFlagCount: bridge.redFlags.count,
@@ -609,7 +617,7 @@ private struct CDSSessionContent: View {
 
     if let diffs = comprehensive?.differential.ranked_diagnoses.prefix(5) {
       text += "\nTop Dx: "
-      text += diffs.map { "\($0.diagnosis) (\(Int($0.probabilityPct))%)" }.joined(separator: ", ")
+      text += diffs.map { "\($0.displayLabel) (\(Int($0.probabilityPct))%)" }.joined(separator: ", ")
       text += "\n"
     }
 

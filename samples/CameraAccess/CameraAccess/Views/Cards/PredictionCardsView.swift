@@ -154,9 +154,9 @@ struct FeatureAttributionCard: View {
           let isTop3 = index < 3
 
           HStack(spacing: 8) {
-            Text(fc.direction == "positive" ? "+" : "-")
+            Text(fc.direction == "increases risk" ? "+" : "-")
               .font(.system(size: isTop3 ? 16 : 14, weight: .bold, design: .monospaced))
-              .foregroundColor(fc.direction == "positive" ? .red : .green)
+              .foregroundColor(fc.direction == "increases risk" ? .red : .green)
               .frame(width: 16)
             Text(formatFeatureName(fc.feature))
               .font(.system(size: isTop3 ? 15 : 14, weight: isTop3 ? .semibold : .medium))
@@ -169,7 +169,7 @@ struct FeatureAttributionCard: View {
               HStack {
                 Spacer()
                 RoundedRectangle(cornerRadius: 2)
-                  .fill((fc.direction == "positive" ? Color.red : Color.green).opacity(isTop3 ? 0.6 : 0.25))
+                  .fill((fc.direction == "increases risk" ? Color.red : Color.green).opacity(isTop3 ? 0.6 : 0.25))
                   .frame(width: barWidth, height: 14)
               }
             }

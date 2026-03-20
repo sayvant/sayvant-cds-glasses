@@ -109,6 +109,7 @@ struct DifferentialData: Decodable {
 
 struct RankedDiagnosis: Decodable, Identifiable {
   let diagnosis: String
+  let display_name: String?
   let probability: Double
   let posterior: Double?
   let features_contributing: [String]?
@@ -119,16 +120,23 @@ struct RankedDiagnosis: Decodable, Identifiable {
 
   var id: String { diagnosis }
   var probabilityPct: Double { probability * 100 }
+
+  /// Prefer backend display_name, fall back to uppercased diagnosis key.
+  var displayLabel: String { display_name ?? diagnosis.uppercased() }
 }
 
 struct CantMissAlert: Decodable, Identifiable {
   let diagnosis: String
+  let display_name: String?
   let probability: Double
   let next_best_test: String?
   let clinical_pearl: String?
 
   var id: String { diagnosis }
   var probabilityPct: Double { probability * 100 }
+
+  /// Prefer backend display_name, fall back to uppercased diagnosis key.
+  var displayLabel: String { display_name ?? diagnosis.uppercased() }
 }
 
 // MARK: - Guidance
