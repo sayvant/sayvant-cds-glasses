@@ -12,14 +12,16 @@ Gemini Live WebSocket provides clinical context detection and optional whispered
 Glasses mic → iPhone AudioManager
     ├── Raw Float32 buffer → LocalSpeechRecognizer (on-device, ~100ms)
     │       ├── onPartial → userTranscript (display)
-    │       ├── flush timer (2s) → PABackendBridge.appendTranscript()
+    │       ├── flush timer (1s) → PABackendBridge.appendTranscript()
+    │       ├── LocalFeatureDetector.scan() → provisional feature chips (instant)
     │       └── onFinal → commit remaining delta + transcript entries
     │
     └── Resampled 16kHz Int16 → Gemini Live WebSocket (if connected)
             └── onToolCall(analyze_encounter) → PABackendBridge.analyzeEncounter()
 
-Auto-analysis loop (3s cycle, 2s initial delay):
+Auto-analysis loop (1.5s cycle, 1s initial delay, +3 char threshold):
     PABackendBridge.fullTranscript → POST /comprehensive_analysis → update all @Published state
+    Pending reanalysis flag queues next call instead of dropping when isPredicting
 
 Both paths → same callComprehensiveAnalysis() core → applyComprehensiveResult()
     → predictionResult, askNextQuestions, redFlags, completenessScore, differentials, workup
@@ -34,10 +36,11 @@ samples/CameraAccess/CameraAccess/
 │
 ├── Gemini/
 │   ├── LocalSpeechRecognizer.swift    # On-device Apple STT, ~100ms latency
+│   ├── LocalFeatureDetector.swift     # On-device regex feature detection (~1ms), 27 patterns
 │   ├── GeminiLiveService.swift        # WebSocket to Gemini Live API
 │   ├── AudioManager.swift             # Mic capture, Bluetooth routing, dual buffer output
 │   ├── GeminiConfig.swift             # Model config, system prompt (silence-enforced), URLs
-│   └── GeminiSessionViewModel.swift   # Session lifecycle, partial flush, auto-analysis, audio gate
+│   └── GeminiSessionViewModel.swift   # Session lifecycle, partial flush (1s), auto-analysis (1.5s), audio gate
 │
 ├── OpenClaw/
 │   ├── PABackendBridge.swift          # HTTP client for /comprehensive_analysis, all @Published clinical state
@@ -99,7 +102,13 @@ samples/CameraAccess/CameraAccess/
 Audio + local STT start immediately in `startSession()`. Gemini connects asynchronously in the background via `connectGemini()`. If Gemini fails, the session continues — local STT feeds the PA backend independently. The `geminiConnected` bool gates audio send to Gemini.
 
 ### Partial transcript flush
-SFSpeechRecognizer's `onFinal` only fires after a pause in speech. During continuous talking, only `onPartial` fires. A 2-second flush timer (`partialFlushTask`) periodically commits partial text to `PABackendBridge.appendTranscript()`. Tracks `lastFlushedPartial` to send only deltas. Resets tracking when STT recognition restarts (detects prefix mismatch). `onFinal` commits any remaining delta beyond what was already flushed.
+SFSpeechRecognizer's `onFinal` only fires after a pause in speech. During continuous talking, only `onPartial` fires. A 1-second flush timer (`partialFlushTask`) periodically commits partial text to `PABackendBridge.appendTranscript()`. Tracks `lastFlushedPartial` to send only deltas. Resets tracking when STT recognition restarts (detects prefix mismatch). `onFinal` commits any remaining delta beyond what was already flushed.
+
+### LocalFeatureDetector (on-device, instant)
+27 regex patterns matching chest_pain.yaml features run on every STT partial (~1ms). Provides provisional feature detection before the backend responds. Categories: red flags (cocaine, syncope, tearing, worst pain, sudden, can't breathe), ACS symptoms (pressure, radiation, diaphoresis, nausea, exertional), risk factors (prior CAD, family hx, HTN, HLD, diabetes, smoking), protective (sharp, reproducible, pleuritic). Feature chips display on HUD as colored pills.
+
+### HUD real-time display
+HUD shows: safety banner, risk strip, top 2 differential diagnoses, detected feature chips (red=risk, green=protective), ask-next hero (4s rotation), completeness bar, missing elements when <70%, live transcript, encounter timer, status dots (AI/CDS/Mic labeled). Red flags persist until encounter ends (no auto-dismiss). Haptic feedback on Start (medium), End (warning), and red flag events (error).
 
 ### Audio gate (silence by default)
 Gemini's system prompt enforces absolute silence. The audio gate (`audioGateOpen`) is closed by default and does NOT open on tool responses. It only opens when the physician taps "What did I miss?" via `requestSummary()`. This prevents Gemini from speaking filler phrases like "Let me check."
