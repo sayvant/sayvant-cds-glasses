@@ -124,20 +124,20 @@ class GeminiSessionViewModel: ObservableObject {
     // doesn't wait for onFinal (which only fires after speech pauses).
     partialFlushTask = Task { [weak self] in
       while !Task.isCancelled {
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
         guard !Task.isCancelled, let self else { break }
         self.flushPartialToBackend()
       }
     }
 
-    // Start auto-analysis loop (reduced delays: 2s initial, 3s cycle)
+    // Start auto-analysis loop (reduced delays: 1s initial, 1.5s cycle)
     lastAutoAnalyzedLength = 0
     autoAnalysisTask = Task { [weak self] in
-      try? await Task.sleep(nanoseconds: 2_000_000_000)
+      try? await Task.sleep(nanoseconds: 1_000_000_000)
       while !Task.isCancelled {
         guard let self else { break }
         let currentLength = self.paBackendBridge.fullTranscript.count
-        let hasNewText = currentLength > self.lastAutoAnalyzedLength + 10
+        let hasNewText = currentLength > self.lastAutoAnalyzedLength + 3
         if hasNewText {
           NSLog("[AutoAnalysis] Triggering (transcript: %d chars)", currentLength)
           let didRun = await self.paBackendBridge.runAutoAnalysis()
@@ -145,7 +145,7 @@ class GeminiSessionViewModel: ObservableObject {
             self.lastAutoAnalyzedLength = currentLength
           }
         }
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
       }
     }
 
@@ -153,7 +153,7 @@ class GeminiSessionViewModel: ObservableObject {
     stateObservation = Task { [weak self] in
       guard let self else { return }
       while !Task.isCancelled {
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        try? await Task.sleep(nanoseconds: 500_000_000)
         guard !Task.isCancelled else { break }
         self.connectionState = self.geminiService.connectionState
         self.isModelSpeaking = self.geminiService.isModelSpeaking

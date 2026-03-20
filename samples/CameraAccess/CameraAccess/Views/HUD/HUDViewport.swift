@@ -61,6 +61,12 @@ struct HUDViewport: View {
             riskStrip(scale: scale)
                 .padding(.top, 8 * scale)
 
+            // ── TOP DIFFERENTIAL: top 2 diagnoses ──
+            topDifferentialLine(scale: scale)
+
+            // ── FEATURE CHIPS: detected clinical features ──
+            featureChipsStrip(scale: scale)
+
             // ── HERO: Ask-next questions ──
             Spacer()
 
@@ -262,6 +268,9 @@ struct HUDViewport: View {
                 completenessBar(scale: scale)
             }
 
+            // Missing elements — what the physician should still cover
+            missingElementsLine(scale: scale)
+
             // Bottom row: end session + status dots
             HStack(alignment: .bottom) {
                 // End encounter button
@@ -301,6 +310,70 @@ struct HUDViewport: View {
             }
             .padding(.horizontal, 24 * scale)
             .padding(.bottom, 16 * scale)
+        }
+    }
+
+    // MARK: - Top Differential Line
+
+    @ViewBuilder
+    private func topDifferentialLine(scale: CGFloat) -> some View {
+        if let diff = bridge.comprehensiveResult?.differential,
+           diff.ranked_diagnoses.count >= 2 {
+            HStack(spacing: 8) {
+                ForEach(Array(diff.ranked_diagnoses.prefix(2))) { dx in
+                    Text("\(dx.displayLabel) \(Int(dx.probability * 100))%")
+                        .font(.system(size: max(8, 8 * scale), weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 4 * scale)
+        }
+    }
+
+    // MARK: - Feature Chips Strip
+
+    @ViewBuilder
+    private func featureChipsStrip(scale: CGFloat) -> some View {
+        if let contributions = prediction?.feature_contributions, !contributions.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(Array(contributions.prefix(5))) { fc in
+                    Text(fc.feature.replacingOccurrences(of: "has_", with: "").uppercased())
+                        .font(.system(size: max(7, 7 * scale), weight: .medium, design: .monospaced))
+                        .foregroundColor(fc.direction == "increases risk" ? .red.opacity(0.8) : .green.opacity(0.7))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(fc.direction == "increases risk" ? Color.red.opacity(0.15) : Color.green.opacity(0.1))
+                        )
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 4 * scale)
+        }
+    }
+
+    // MARK: - Missing Elements Line
+
+    @ViewBuilder
+    private func missingElementsLine(scale: CGFloat) -> some View {
+        if let completeness = bridge.comprehensiveResult?.guidance.completeness,
+           completeness.overall_score < 70 {
+            // Prefer top-level missing_elements, fall back to category-level missing
+            let topMissing = completeness.missing_elements ?? []
+            let categoryMissing: [String] = {
+                guard topMissing.isEmpty, let cats = completeness.category_scores else { return [] }
+                return cats.values.flatMap { $0.missing ?? [] }
+            }()
+            let allMissing = Array((topMissing.isEmpty ? categoryMissing : topMissing).prefix(3))
+            if !allMissing.isEmpty {
+                Text("MISSING: " + allMissing.joined(separator: ", "))
+                    .font(.system(size: max(8, 8 * scale), design: .monospaced))
+                    .foregroundColor(.white.opacity(0.4))
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+            }
         }
     }
 
@@ -420,7 +493,7 @@ struct HUDAskNextHero: View {
         timer?.cancel()
         guard questions.count > 1 else { return }
 
-        timer = Timer.publish(every: 6, on: .main, in: .common)
+        timer = Timer.publish(every: 4, on: .main, in: .common)
             .autoconnect()
             .sink { _ in
                 withAnimation { isVisible = false }

@@ -76,6 +76,9 @@ class PABackendBridge: ObservableObject {
   /// Whether an analysis call is in flight.
   @Published var isPredicting: Bool = false
 
+  /// Set when auto-analysis is requested while isPredicting is true.
+  @Published var pendingReanalysis: Bool = false
+
   /// Last analysis error (displayed to user).
   @Published var analysisError: String?
 
@@ -377,11 +380,18 @@ class PABackendBridge: ObservableObject {
   /// Returns true if analysis ran (even if backend errored), false if skipped.
   @discardableResult
   func runAutoAnalysis() async -> Bool {
-    guard !isPredicting else { return false }
+    guard !isPredicting else {
+      pendingReanalysis = true
+      return false
+    }
     guard !fullTranscript.isEmpty else { return false }
     isPredicting = true
     _ = await callComprehensiveAnalysis(text: fullTranscript)
     isPredicting = false
+    if pendingReanalysis {
+      pendingReanalysis = false
+      Task { await self.runAutoAnalysis() }
+    }
     return true
   }
 
