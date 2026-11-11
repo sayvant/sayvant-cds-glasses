@@ -6,3 +6,19 @@ samples/CameraAccessAndroid/local.properties
 samples/CameraAccessAndroid/.gradle/
 samples/CameraAccessAndroid/build/
 samples/CameraAccessAndroid/app/build/
+
+# secrets and local state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+token.json
+service-account*.json
+.claude/settings.local.json
+CLAUDE.local.md
+*.tfstate
+*.tfstate.*
